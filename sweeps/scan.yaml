@@ -1,0 +1,40 @@
+program: main.py
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - ${args}
+method: grid
+metric:
+  name: validation/mean_accuracy
+  goal: maximize
+parameters:
+  name:
+    value: scan
+  log:
+    value: wandb
+  profile:
+    value: scan
+  stop_after:
+    value: 25000
+  step_per_mask:
+    value: 25000
+  encoder_decoder.embedding_size:
+    value: 16
+  mask_loss_weight:
+    value: 3e-5
+  mask_lr:
+    value: 1e-2
+  sweep_id_for_grid_search:
+    distribution: categorical
+    values:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
