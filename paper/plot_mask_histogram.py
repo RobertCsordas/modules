@@ -76,10 +76,12 @@ def draw(trackers, fname, log=False, **kwargs):
     for name in human_readable_names.keys():
         stat = trackers[name].get()
         plt.plot([i/N_POINTS for i in range(N_SKIP, N_POINTS)], t(stat.mean[N_SKIP:]))
-        plt.fill_between([i / N_POINTS for i in range(N_SKIP, N_POINTS)], t(stat.mean - stat.std)[N_SKIP:], t(stat.mean + stat.std)[N_SKIP:], alpha=0.3c)
+        plt.fill_between([i / N_POINTS for i in range(N_SKIP, N_POINTS)], t(stat.mean - stat.std)[N_SKIP:], t(stat.mean + stat.std)[N_SKIP:], alpha=0.3)
 
     plt.legend(human_readable_names.values(), loc="upper center")
     plt.ylim(bottom=0, **kwargs)
+    plt.xlabel('mask value')
+    plt.ylabel('log density' if log else 'density')
 
     fig.savefig(os.path.join(BASE_DIR,fname), bbox_inches='tight')
 
