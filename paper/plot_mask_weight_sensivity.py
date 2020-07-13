@@ -44,8 +44,8 @@ for grp, runs in runs.items():
             sharing_stats[stat_name[0]][stat_name[1]] = StatTracker()
             accuracy_stats[stat_name[0]][stat_name[1]] = StatTracker()
 
-        accuracy_stats[stat_name[0]][stat_name[1]].add(run.summary["analyzer/baseline/validation/iid/accuracy"])
-        sharing_stats[stat_name[0]][stat_name[1]].add(ssum / tsum)
+        accuracy_stats[stat_name[0]][stat_name[1]].add(run.summary["analyzer/baseline/validation/iid/accuracy"]*100)
+        sharing_stats[stat_name[0]][stat_name[1]].add(ssum / tsum * 100)
 
 
 def plot(accuracy_stats, sharing_stats):
@@ -70,13 +70,13 @@ def plot(accuracy_stats, sharing_stats):
     del c[selected]
     del y[selected]
 
-    sc=plt.scatter(x=x, y=y, s=[50 for _ in c], vmin=0.25, vmax=0.55, c=c, cmap='viridis')
-    plt.scatter(x=xs, y=ys, s=[130 for _ in cs], vmin=0.25, vmax=0.55, c=cs, cmap='viridis', marker='*', edgecolors=(0,0,0), linewidths=0.5)
+    sc=plt.scatter(x=x, y=y, s=[50 for _ in c], vmin=25, vmax=55, c=c, cmap='viridis')
+    plt.scatter(x=xs, y=ys, s=[130 for _ in cs], vmin=25, vmax=55, c=cs, cmap='viridis', marker='*', edgecolors=(0,0,0), linewidths=0.5)
     plt.axvline(x=1e-4, color="red", zorder=-100)
     plt.xscale('log')
     # plt.yscale('log')
-    plt.xlabel("$\\beta$")
-    plt.ylabel("accuracy")
+    plt.xlabel("$\\beta = b\\alpha$")
+    plt.ylabel("Accuracy [\%]")
 
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.1)
