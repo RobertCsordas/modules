@@ -2,8 +2,9 @@
 
 The official repository for our paper "Are Neural Nets Modular? Inspecting Their Functionality Through Differentiable Weight Masks".
 
+
+Spotlight presentation: https://www.youtube.com/watch?v=l70-upLWfLg  
 Paper: http://people.idsia.ch/~csordas/are_neural_networks_modular.pdf
-Spotlight presentation: https://www.youtube.com/watch?v=l70-upLWfLg
 
 ## Installation
 
