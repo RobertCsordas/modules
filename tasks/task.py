@@ -262,14 +262,20 @@ class Task:
             return {}
         res = {f"masks/{k}": framework.visualize.plot.Image(draw_mask([m[k] for m in masks],
                                len(self.model.masks)-1, presence_mask=presence.get(k))) for k in masks[0].keys()}
-        res[f"mask_histogram/{upto_channels}"] = draw_mask_histogram(self.model.get_masks(upto_channels))
+        res[f"mask_histogram/{upto_channels}"] = draw_mask_histogram(self.model.get_mask_probs(upto_channels))
+        res[f"mask_histogram_nonzero/{upto_channels}"] = draw_mask_histogram(self.model.get_mask_probs(upto_channels),
+                                                                             threshold=1e-2)
         return res
 
     def plot_selected_masks(self, indices: Iterable[int]) -> Dict[str, Any]:
         masks = [self.model.get_masks(i) for i in indices]
         res = {f"masks/{k}": framework.visualize.plot.Image(draw_mask([m[k] for m in masks]))
                               for k in masks[0].keys()}
-        res.update({f"mask_histogram/{i}": draw_mask_histogram(m) for i, m in enumerate(masks)})
+        res.update({f"mask_histogram/{i}": draw_mask_histogram(self.model.get_mask_probs(m))
+                    for i, m in enumerate(indices)})
+        res.update({f"mask_histogram_nonzero/{i}": draw_mask_histogram(self.model.get_mask_probs(m),
+                                                                       threshold=1e-2)
+                    for i, m in enumerate(indices)})
         return res
 
     def do_inverse_mask_test(self, stage: int, split: Optional[str] = None) -> Dict[str, Any]:

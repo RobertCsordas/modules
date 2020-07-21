@@ -55,5 +55,7 @@ def draw_mask(mask_list: List[torch.Tensor], n_channels: Optional[int] = None,
     return to_valid_image_format(res)
 
 
-def draw_mask_histogram(masks: Masks) -> framework.visualize.plot.Histogram:
-    return framework.visualize.plot.Histogram(torch.cat([m.detach().view(-1) for m in masks.values()], 0))
+def draw_mask_histogram(masks: Masks, threshold: float=0) -> framework.visualize.plot.Histogram:
+    all_w = torch.cat([m.detach().view(-1) for m in masks.values()], 0)
+    all_w = all_w[all_w > threshold]
+    return framework.visualize.plot.Histogram(all_w)
