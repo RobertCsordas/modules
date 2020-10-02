@@ -1,0 +1,39 @@
+program: main.py
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - ${args}
+method: grid
+metric:
+  name: validation/mean_accuracy
+  goal: maximize
+parameters:
+  name:
+    value: dm_math_sort
+  log:
+    value: wandb
+  profile:
+    value: deepmind_math
+  dm_math.task:
+    value: comparison__sort
+  test_interval:
+    value: 10000
+  stop_after:
+    value: 30000
+  step_per_mask:
+    value: 30000
+  batch_size:
+    value: 256
+  sweep_id_for_grid_search:
+    distribution: categorical
+    values:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+  mask_loss_weight:
+    value: 3e-06
+  mask_lr:
+    value: 0.03

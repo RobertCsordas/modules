@@ -10,7 +10,7 @@ metric:
   goal: maximize
 parameters:
   name:
-    value: addmul_feedforward_alpha
+    value: addmul_ff_alpha_analysis
   log:
     value: wandb
   task:

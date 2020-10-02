@@ -5,11 +5,12 @@ from .batch_ops import batch_conv2d
 
 
 class Conv2d(MaskedModule):
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, stride: int = 1, padding: int=0):
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, stride: int = 1, padding: int=0,
+                 bias: bool = True):
         super().__init__()
 
         self.weight = torch.nn.Parameter(torch.Tensor(out_channels, in_channels, kernel_size, kernel_size))
-        self.bias = torch.nn.Parameter(torch.Tensor(out_channels))
+        self.bias = torch.nn.Parameter(torch.Tensor(out_channels)) if bias else None
         self.reset_parameters()
 
         self.stride = stride

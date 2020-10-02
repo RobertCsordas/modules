@@ -4,11 +4,40 @@ from interfaces import Result, ModelInterface
 import torch
 import torch.utils.data
 from tqdm import tqdm
-from typing import Dict, Any, Iterable, Tuple, Optional
+from typing import Dict, Any, Iterable, Tuple, Optional, List, Union, Callable
 from grad_norm import GradNormTracker
 import functools
 from draw import draw_mask, draw_mask_histogram
 import os
+import re
+from dataclasses import dataclass
+import optimizer
+
+
+@dataclass
+class TaskDataset:
+    name: str
+    get_train_set: Union[torch.utils.data.Dataset, Callable[[], torch.utils.data.Dataset]]
+    get_valid_set: Union[torch.utils.data.Dataset, Callable[[], torch.utils.data.Dataset], None]
+
+    @staticmethod
+    def _callable_to_dataset(ds: Union[torch.utils.data.Dataset, Callable[[], torch.utils.data.Dataset]]) -> \
+            torch.utils.data.Dataset:
+        if isinstance(ds, torch.utils.data.Dataset):
+            return ds
+        else:
+            return ds()
+
+    @property
+    def train_set(self) -> torch.utils.data.Dataset:
+        return self._callable_to_dataset(self.get_train_set)
+
+    @property
+    def valid_set(self) -> Optional[torch.utils.data.Dataset]:
+        if self.get_valid_set is None:
+            return None
+        else:
+            return self._callable_to_dataset(self.get_valid_set)
 
 
 class Task:
@@ -18,11 +47,21 @@ class Task:
     batch_dim: int
     train_set: torch.utils.data.Dataset
     model: MaskedModel
+    TRAIN_NUM_WORKERS = 1
+    ANALYZE_TRAIN_SET = True
 
     def __init__(self, helper: framework.helpers.TrainingHelper):
         self.helper = helper
         self.valid_sets = framework.data_structures.DotDict()
         self.loss_average = framework.utils.Average()
+        self.forward_time_meter = framework.utils.ElapsedTimeMeter()
+        self.load_time_meter = framework.utils.ElapsedTimeMeter()
+        self.plot_time_meter = framework.utils.ElapsedTimeMeter()
+
+        self.tasks: List[TaskDataset] = []
+
+        self.step_lr_scheduler = optimizer.StepLrSched(self.helper.opt.lr, self.helper.opt.lr_sched.steps,
+                                                       self.helper.opt.lr_sched.gamma)
 
         self.create_grad_norm_tracker()
         self.create_datasets()
@@ -32,22 +71,35 @@ class Task:
         self.create_optimizer()
         self.create_validate_on_train(self.train_set)
 
-    def create_loaders(self):
-        self.train_loader = self.create_train_loader(self.train_set)
-        self.valid_loaders = framework.data_structures.DotDict()
-        self.valid_loaders.update({k: torch.utils.data.DataLoader(v, batch_size=self.helper.opt.batch_size,
+
+    def create_valid_loader(self, vset: torch.utils.data.Dataset) -> torch.utils.data.DataLoader:
+        return torch.utils.data.DataLoader(vset, batch_size=self.helper.opt.test_batch_size or
+                                                            self.helper.opt.batch_size,
                                    collate_fn=framework.loader.collate.VarLengthCollate(batch_dim=self.batch_dim),
-                                   num_workers=1) for k, v in self.valid_sets.items()})
+                                   num_workers=1)
 
 
-    def create_train_loader(self, loader: torch.utils.data.Dataset, seed: Optional[int] = None) -> \
-            torch.utils.data.DataLoader:
-        return torch.utils.data.DataLoader(loader, batch_size=self.helper.opt.batch_size,
+    def create_loaders(self):
+        self.train_loader = self.create_train_loader(self.train_set, mask = False)
+        self.valid_loaders = framework.data_structures.DotDict()
+        self.valid_loaders.update({k: self.create_valid_loader(v) for k, v in self.valid_sets.items()})
+
+    def replace_valid_set(self, name: str, vset: torch.utils.data.Dataset):
+        self.valid_sets[name] = vset
+        self.valid_loaders[name] = self.create_valid_loader(vset)
+
+    def create_train_loader(self, loader: torch.utils.data.Dataset, seed: Optional[int] = None,
+                            mask: bool = True) -> torch.utils.data.DataLoader:
+
+        batch_size = (self.helper.opt.mask_batch_size or self.helper.opt.batch_size) if mask else \
+                     self.helper.opt.batch_size
+
+        return torch.utils.data.DataLoader(loader, batch_size=batch_size,
                                            sampler=framework.loader.sampler.InfiniteSampler(
                                                loader, seed = seed),
                                            collate_fn=framework.loader.collate.VarLengthCollate(
                                                batch_dim=self.batch_dim),
-                                           num_workers=1, pin_memory=True)
+                                           num_workers=self.TRAIN_NUM_WORKERS, pin_memory=True)
 
     def create_validate_on_train(self, set: torch.utils.data.Dataset):
         self.valid_sets.train = set
@@ -63,7 +115,9 @@ class Task:
         self.mask_grad_norm = GradNormTracker()
 
     def mask_filter(self, name: str) -> bool:
-        return (not "embedding" in name) and ((not self.helper.opt.bias_no_mask) or ("bias" not in name))
+        return (not "embedding" in name) and ((not self.helper.opt.bias_no_mask) or ("bias" not in name)) and \
+               (not name.endswith("rezero_alpha")) and ((not self.helper.opt.analysis.skip_layernorm) or
+               (not re.match(".+_norm[0-9]+_(beta|gamma)$", name)))
 
     def get_n_mask_samples(self):
         return 4
@@ -83,11 +137,42 @@ class Task:
         self.helper.saver.register("optimizer", optimizer, replace=True)
 
     def create_optimizer(self):
-        self.set_optimizer(torch.optim.Adam(self.model.model_parameters.values(), self.helper.opt.lr))
+        if self.helper.opt.optimizer == "adam":
+            self.set_optimizer(torch.optim.Adam(self.model.model_parameters.values(), self.helper.opt.lr,
+                                                weight_decay=self.helper.opt.wd))
+        elif self.helper.opt.optimizer == "sgd":
+            self.set_optimizer(torch.optim.SGD(self.model.model_parameters.values(), self.helper.opt.lr,
+                                                weight_decay=self.helper.opt.wd, momentum=0.9))
+        else:
+            assert False, f"Unsupported optimizer: {self.helper.opt.optimizer}"
 
     def clip_gradients(self):
         if self.helper.opt.grad_clip:
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.helper.opt.grad_clip)
+
+    def set_optimizer_lr(self, lr: float):
+        framework.utils.set_lr(self.optimizer, lr)
+        if self.helper.state.iter % 100 == 0:
+            self.helper.summary.log({"lr": lr})
+
+    def set_linear_warmup(self, curr_step: int, n_steps: int, final: float) -> float:
+        if curr_step >= n_steps:
+            lr = final
+        else:
+            lr = final / n_steps * (curr_step+1)
+
+        self.set_optimizer_lr(lr)
+        return lr
+
+    def set_mask_lr(self, start_step: int) -> float:
+        # Linear warmup for mask learning rate
+        return self.set_linear_warmup(self.helper.state.iter - start_step,
+                                      self.helper.opt.masking.warmup.nsteps,
+                                      self.get_mask_lr())
+
+    def set_lr(self):
+        self.set_linear_warmup(self.helper.state.iter, self.helper.opt.lr_warmup,
+                               self.step_lr_scheduler.get(self.helper.state.iter))
 
     def validate_on(self, set: torch.utils.data.Dataset, loader: torch.utils.data.DataLoader) -> Tuple[Any, float]:
         self.model.eval()
@@ -147,6 +232,9 @@ class Task:
 
         if self.helper.state.iter % 20 == 0:
             plots["train/loss"] = self.loss_average.get()
+            plots["timing/ms_per_iter"] = self.forward_time_meter.get(True)*1000/20
+            plots["timing/ms_per_load"] = self.load_time_meter.get(True)*1000/20
+            plots["timing/ms_per_plot"] = self.plot_time_meter.get(True)*1000/20
             plots.update({f"grad_norms/{k}": v for k, v in self.plot_grad_norms().items()})
 
         if self.helper.state.iter % self.helper.opt.test_interval == 0:
@@ -158,12 +246,18 @@ class Task:
         self.loss_average.reset()
 
         for d in self.train_loader:
+            self.load_time_meter.stop()
             if (self.helper.opt.stop_after or 10e10) <= self.helper.state.iter:
                 break
 
             self.train_step_reconfig()
+            self.set_lr()
             res = self.train_step(d)
-            self.helper.summary.log(self.plot(res))
+
+            with self.plot_time_meter:
+                self.helper.summary.log(self.plot(res))
+
+            self.load_time_meter.start()
 
     def track_grad_norms(self):
         self.param_grad_norm.add_dict(self.model.model_parameters)
@@ -171,28 +265,28 @@ class Task:
             self.mask_grad_norm.add_dict(self.model.active_masks)
 
     def train_step(self, data: Dict[str, torch.Tensor]) -> Result:
-        data = self.helper.to_device(data)
+        with self.forward_time_meter:
+            data = self.helper.to_device(data)
 
-        self.optimizer.zero_grad()
+            self.optimizer.zero_grad()
 
-        res = self.model_interface(data)
-        res.loss.backward()
+            res = self.model_interface(data)
+            res.loss.backward()
 
-        self.track_grad_norms()
+            self.track_grad_norms()
 
-        if self.model.masking_enabled:
-            (self.model.mask_loss(self.mask_grad_norm.get() if self.helper.opt.scale_mask_loss else None) /
-                                  self.helper.opt.batch_size).backward()
+            if self.model.masking_enabled:
+                (self.model.mask_loss(self.mask_grad_norm.get() if self.helper.opt.scale_mask_loss else None) /
+                                      self.helper.opt.batch_size).backward()
 
-        self.post_backward()
+            self.post_backward()
 
-        self.clip_gradients()
-        self.optimizer.step()
+            self.clip_gradients()
+            self.optimizer.step()
 
-        self.helper.state.iter += 1
+            self.helper.state.iter += 1
 
         return res
-
 
     def plot_remaining_stat(self, ref: int, others: Iterable[int]) -> Dict[str, float]:
         mask_indices = [ref]+list(others)
@@ -214,7 +308,7 @@ class Task:
 
             for i, m in enumerate(n[1:]):
                 res[f"mask_remaining/layers/{k}/n_{mask_indices[i+1]}"] = m
-                res[f"mask_remaining/layers/{k}/remaining_{mask_indices[i+1]}"] = float(m) / n[0]
+                res[f"mask_remaining/layers/{k}/remaining_{mask_indices[i+1]}"] = float(m) / max(n[0], 1)
 
         res[f"mask_remaining/all/n_total"] = n_total
         res.update({f"mask_remaining/masks/n_{i}": v for i, v in enumerate(n_per_mask)})
@@ -320,4 +414,102 @@ class Task:
         raise NotImplementedError()
 
     def get_n_masks(self) -> int:
-        raise NotImplementedError()
+        if self.tasks:
+            return len(self.tasks)+int(self.ANALYZE_TRAIN_SET)
+        else:
+            raise NotImplementedError()
+
+    def set_iid_dataset(self, dataset: Optional[torch.utils.data.Dataset]):
+        if "iid" in self.valid_sets:
+            if dataset is None:
+                del self.valid_sets["iid"]
+                del self.valid_loaders["iid"]
+            elif self.valid_sets.iid is not dataset:
+                self.replace_valid_set("iid", dataset)
+        elif dataset is not None:
+            self.replace_valid_set("iid", dataset)
+
+    def analysis_stage_finished(self, index: int, name: str):
+        plots = {f"analysis_results/{name}/{k}": v for k, v in self.validate().items()}
+        self.helper.summary.log(plots)
+        self.export_masks(index)
+
+    def analysis_periodic_plot(self, index: int, name: str) -> Dict[str, Any]:
+        plots = {}
+
+        if self.helper.opt.analysis.plot_masks:
+            plots.update({f"analyzer/{name}/{k}": v for k, v in \
+                          self.plot_selected_masks([0] if index == 0 else [0, index]).items()})
+
+        if index > 0:
+            plots.update({f"analyzer_remaining/{name}/{k}": v for k, v in
+                          self.plot_remaining_stat(0, [index]).items()})
+
+        return plots
+
+    def prepare_model_for_analysis(self):
+        # The model is not trained anymore. Dropouts are not needed.
+        self.model.set_model_to_eval()
+
+    def set_train_set(self, ds: torch.utils.data.Dataset):
+        self.train_set = ds
+        self.train_loader = self.create_train_loader(self.train_set, mask = False)
+        self.create_validate_on_train(self.train_set)
+
+    def set_baseline_mode(self):
+        # In case there is only 1 set to analyze, then we know what to do, otherwise it is task-specific
+        if len(self.tasks)!=1 or not self.ANALYZE_TRAIN_SET:
+            raise NotImplementedError
+
+        self.set_train_set(self.tasks[0].train_set)
+        self.set_iid_dataset(self.tasks[0].valid_set)
+
+    def get_mask_lr(self) -> float:
+        return self.helper.opt.mask_lr or self.helper.opt.lr
+
+    def set_mask_stage(self, index: int, name: str):
+        self.model.set_active(index)
+        self.set_optimizer(torch.optim.Adam(self.model.masks[index].parameters(), self.get_mask_lr()))
+
+    def post_train(self):
+        assert self.tasks
+
+        self.prepare_model_for_analysis()
+
+        task_list = ([TaskDataset("verify", self.train_set, None)] if self.ANALYZE_TRAIN_SET else []) + self.tasks
+
+        for stage, task in enumerate(task_list):
+            if self.helper.opt.analysis.only_verify_masks and stage > 0:
+                break
+
+            print(f"Analysis: Training on {task.name}.")
+            self.mask_grad_norm.clear()
+            self.set_mask_stage(stage, task.name)
+
+            loader = self.create_train_loader(task.train_set, 1234)
+            start = self.helper.state.iter
+
+            self.create_validate_on_train(task.train_set)
+
+            if stage >= 1 or not self.ANALYZE_TRAIN_SET:
+                self.set_iid_dataset(task.valid_set)
+
+            for d in loader:
+                if self.helper.state.iter - start > self.helper.opt.step_per_mask:
+                    self.analysis_stage_finished(stage, task.name)
+                    break
+
+                lr = self.set_mask_lr(start)
+                res = self.train_step(d)
+
+                plots = self.plot(res)
+                plots.update({f"analyzer/{task.name}/{k}": v for k, v in plots.items()})
+
+                if self.helper.state.iter % 1000 == 0:
+                    plots.update(self.analysis_periodic_plot(stage, task.name))
+
+                if self.helper.state.iter % 10 == 0:
+                    plots["mask_lr"] = lr
+                self.helper.summary.log(plots)
+
+        self.helper.summary.log(self.plot_remaining_stat(0, range(1, len(self.model.masks))))

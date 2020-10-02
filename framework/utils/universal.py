@@ -16,5 +16,5 @@ def apply_recursive(d, fn: Callable, filter: Callable = None):
             return d
 
 
-def apply_to_tensors(d, fn):
+def apply_to_tensors(d, fn: Callable):
     return apply_recursive(d, fn, torch.is_tensor)

@@ -1,3 +1,19 @@
+# Copyright 2017 Robert Csordas. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# ==============================================================================
+
 import os
 import json
 import argparse
@@ -187,31 +203,28 @@ class ArgumentParser:
         if fname is None:
             fname = self._get_save_filename()
 
-        if os.path.isfile(fname):
-            self.load(fname)
+        if fname is not None:
+            if os.path.isfile(fname):
+                self.load(fname)
 
-        dir = os.path.dirname(fname)
-        if not os.path.isdir(dir):
-            os.makedirs(dir)
+            dir = os.path.dirname(fname)
+            os.makedirs(dir, exist_ok=True)
 
-        self.save(fname)
+            self.save(fname)
         return self.parsed
 
     def _get_save_filename(self, opt=None):
         opt = self.parse() if opt is None else opt
         dir = self.get_train_dir(opt)
-        return os.path.join(dir, "args.json")
+        return None if dir is None else os.path.join(dir, "args.json")
 
     def parse_and_sync(self):
         opt = self.parse()
-        dir = self.get_train_dir(opt)
-        os.makedirs(dir, exist_ok=True)
-
         return self.sync(self._get_save_filename(opt))
 
     def parse_and_try_load(self):
         fname = self._get_save_filename()
-        if os.path.isfile(fname):
+        if fname and os.path.isfile(fname):
             self.load(fname)
 
         return self.parsed

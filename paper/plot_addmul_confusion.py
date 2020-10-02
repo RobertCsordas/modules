@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import wandb
 import os
 from typing import List, Dict
@@ -33,7 +34,7 @@ print(runs.keys())
 
 def draw_confusion(means: np.ndarray, std: np.ndarray):
     print("MEAN", means)
-    figure = plt.figure(figsize=[2.5,0.5])#means.shape)
+    figure = plt.figure(figsize=[2.5,0.5])
 
     ax = plt.gca()
     im = plt.imshow(means, interpolation='nearest', cmap=plt.cm.viridis, aspect='auto', vmin=0, vmax=100)
@@ -64,6 +65,7 @@ def draw_confusion(means: np.ndarray, std: np.ndarray):
 
     # plt.tight_layout()
     return figure
+
 
 def create_trackers(runs):
     trackers = {}
@@ -102,6 +104,6 @@ for grp, runs in trackers.items():
         prefix = f"out/addmul_confusion_plot/{grp}"
         dir = os.path.join(prefix, os.path.dirname(k))
         os.makedirs(dir, exist_ok=True)
-        figure.savefig(f"{prefix}/{k}.pdf", bbox_inches='tight')
+        figure.savefig(f"{prefix}/{k}.pdf", bbox_inches='tight', pad_inches = 0.01)
         plt.close()
 # runs = filter(lambda x: x.config["task"].startswith("addmul"), runs)

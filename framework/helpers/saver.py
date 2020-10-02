@@ -20,6 +20,7 @@ class PyObjectSaver(SaverElement):
     def load(self, state):
         def _load(target, state):
             if hasattr(target, "load_state_dict"):
+                print("LOAD STATE DICT")
                 target.load_state_dict(state)
             elif isinstance(target, dict):
                 for k, v in state.items():
@@ -37,6 +38,7 @@ class PyObjectSaver(SaverElement):
             return target
 
         _load(self._obj, state)
+        return True
 
     def save(self):
         def _save(target):
@@ -84,7 +86,9 @@ class Saver:
                 dir = self.dir
             fname = os.path.join(dir, self.model_name_from_index(iter))
 
-        os.makedirs(os.path.dirname(fname), exist_ok=True)
+        dname = os.path.dirname(fname)
+        if dname:
+            os.makedirs(dname, exist_ok=True)
 
         print("Saving %s" % fname)
         for name, fns in self.savers.items():
@@ -180,7 +184,9 @@ class Saver:
                 print("WARNING: failed to load state of %s. It doesn't exists." % k)
                 continue
 
+            print(f"Loading {k}")
             if not self.savers[k].load(s):
+                print(f"Failed to load {k}")
                 return False
 
         return True

@@ -11,7 +11,7 @@ import os
 basedir = "out/transfer_sharing"
 os.makedirs(basedir, exist_ok=True)
 
-def run(name: str, shape: List[int], y_lim=None):
+def run(name: str, shape: List[int], y_lim=None, coord=None):
 
     runs = lib.get_runs([name])
 
@@ -63,9 +63,11 @@ def run(name: str, shape: List[int], y_lim=None):
     if y_lim is not None:
         plt.ylim(*y_lim)
 
-    fig.savefig(f"{basedir}/{name}.pdf", bbox_inches='tight')
+    if coord is not None:
+        fig.axes[0].yaxis.set_label_coords(*coord)
+    fig.savefig(f"{basedir}/{name}.pdf", bbox_inches='tight', pad_inches = 0.01)
 
 
-run("transfer_sharing", [4,1.5])
+run("transfer_sharing_long", [4,1.3], coord=(-0.1, 0.4))
 run("transfer_sharing_prefer_old", [4,2], y_lim=(0,85))
 run("transfer_sharing_prefer_old_even_more", [4,2], y_lim=(0,85))

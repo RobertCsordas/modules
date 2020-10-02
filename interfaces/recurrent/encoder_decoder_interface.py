@@ -7,6 +7,7 @@ import random
 from ..result import Result
 from ..model_interface import ModelInterface
 
+
 @dataclass
 class EncoderDecoderResult(Result):
     outputs: torch.Tensor

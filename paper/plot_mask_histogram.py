@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import os
 import torch
 import numpy as np
@@ -69,8 +70,9 @@ for n, runs in runs.items():
         add_tracker(trackers, n, m[m > (0.1 / N_POINTS)])
         add_tracker(trackers_all, n, m)
 
-def draw(trackers, fname, log=False, **kwargs):
-    fig = plt.figure(figsize=[5,2])
+
+def draw(trackers, fname, shape, log=False, **kwargs):
+    fig = plt.figure(figsize=shape)
     N_SKIP = 0
     t = (lambda x: np.log(x)) if log else (lambda x: x)
     for name in human_readable_names.keys():
@@ -83,7 +85,7 @@ def draw(trackers, fname, log=False, **kwargs):
     plt.xlabel('mask value')
     plt.ylabel('log density' if log else 'density')
 
-    fig.savefig(os.path.join(BASE_DIR,fname), bbox_inches='tight')
+    fig.savefig(os.path.join(BASE_DIR,fname), bbox_inches='tight', pad_inches = 0.01)
 
-draw(trackers, "mask_histogram.pdf", top=1300)
-draw(trackers_all, "mask_histogram_all.pdf", log=True)
+draw(trackers, "mask_histogram.pdf", shape=[5,2], top=1300)
+draw(trackers_all, "mask_histogram_all.pdf", shape=[5,1.91], log=True)

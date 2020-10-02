@@ -148,9 +148,8 @@ class Heatmap(CustomPlot):
         self.y_marks = y_marks
 
     def to_matplotlib(self):
-        figure = plt.figure(figsize=self.map.shape)
-        ax = plt.gca()
-        im = plt.imshow(self.map, interpolation='nearest', cmap=plt.cm.Blues)
+        figure, ax = plt.subplots(figsize=(self.map.shape[0]*0.25 + 2, self.map.shape[1]*0.15+1.5))
+        im = plt.imshow(self.map, interpolation='nearest', cmap=plt.cm.Blues, aspect='auto')
 
         x_marks = self.x_marks if self.x_marks is not None else [str(i) for i in range(self.map.shape[1])]
         assert len(x_marks) == self.map.shape[1]
@@ -158,8 +157,8 @@ class Heatmap(CustomPlot):
         y_marks = self.y_marks if self.y_marks is not None else [str(i) for i in range(self.map.shape[0])]
         assert len(y_marks) == self.map.shape[0]
 
-        plt.xticks(np.arange(self.map.shape[1]), x_marks, rotation=45)
-        plt.yticks(np.arange(self.map.shape[0]), y_marks)
+        plt.xticks(np.arange(self.map.shape[1]), x_marks, rotation=45, fontsize=8, ha="right", rotation_mode="anchor")
+        plt.yticks(np.arange(self.map.shape[0]), y_marks, fontsize=8)
 
         # Use white text if squares are dark; otherwise black.
         threshold = self.map.max() / 2.
@@ -167,13 +166,13 @@ class Heatmap(CustomPlot):
         rmap = np.around(self.map, decimals=self.round_decimals) if self.round_decimals is not None else self.map
         for i, j in itertools.product(range(self.map.shape[0]), range(self.map.shape[1])):
             color = "white" if self.map[i, j] > threshold else "black"
-            plt.text(j, i, rmap[i, j], horizontalalignment="center", color=color)
+            plt.text(j, i, rmap[i, j], ha="center", va="center", color=color, fontsize=8)
 
         plt.ylabel(self.ylabel)
         plt.xlabel(self.xlabel)
 
         divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.1)
+        cax = divider.append_axes("right", size=0.25, pad=0.1)
         plt.colorbar(im, cax)
 
         plt.tight_layout()

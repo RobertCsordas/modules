@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import lib
 from lib import StatTracker
 from lib.common import group
@@ -9,9 +8,7 @@ import matplotlib.pyplot as plt
 
 runs = lib.get_runs(["addmul_feedforward", "addmul_feedforward_big", "addmul_feedforward_huge"])
 
-
 os.makedirs("out", exist_ok=True)
-
 
 runs = group(runs, ["layer_sizes"])
 print(runs)

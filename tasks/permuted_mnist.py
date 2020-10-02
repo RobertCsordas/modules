@@ -74,7 +74,7 @@ class PermutedMnistTask(Task):
         self.init_masks(self.weight_masks, perm)
 
         self.set_optimizer(torch.optim.Adam(list(self.model.model_parameters.values())
-                                            + list(self.model.masks[perm].parameters()), self.helper.opt.lr))
+                                            + list(self.model.masks[perm].parameters()), self.get_mask_lr()))
 
     def post_backward(self):
         for k, mask in self.weight_masks.items():

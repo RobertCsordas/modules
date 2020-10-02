@@ -51,7 +51,7 @@ def plot_both(ff, rnn):
     ff_stats = calc_stat({"a":ff}, lambda k: (k.startswith("final_accuracy/") and '/iid/accuracy/' in k and '/tuple/' in k) or (k.startswith("inverse_mask_test/") and '/iid/accuracy/' in k))["a"]
     rnn_stats = calc_stat({"a":rnn}, lambda k: (k.startswith("final_accuracy/") and '/iid/accuracy/' in k and '/tuple/' in k) or (k.startswith("inverse_mask_test/") and '/iid/accuracy/' in k))["a"]
 
-    fig = plt.figure(figsize=[4,1.1])
+    fig = plt.figure(figsize=[4,0.95])
     # ax = fig.add_subplot(111, aspect=0.07)
 
     for t in range(2):
@@ -72,7 +72,8 @@ def plot_both(ff, rnn):
     # plt.legend(["F1", "F2", "R1", "R2"], bbox_to_anchor=(1.1, 1.05))
 
     fname = f"{BASE_DIR}/tuple_performance.pdf"
-    fig.savefig(fname, bbox_inches='tight')
+    fig.axes[0].yaxis.set_label_coords(-0.12,0.4)
+    fig.savefig(fname, bbox_inches='tight', pad_inches = 0.01)
 
 rnn_runs = lib.get_runs(["tuple_rnn"])
 feedforward_runs = lib.get_runs(["tuple_feedforward_big"])

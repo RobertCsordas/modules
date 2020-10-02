@@ -1,8 +1,9 @@
 import torch
 from layers import Conv2d, Linear
 
+
 class ConvModel(torch.nn.Module):
-    def __init__(self, in_channels: int, out_channels: int):
+    def __init__(self, in_channels: int, out_channels: int, dropout: bool = True):
         super().__init__()
 
         self.features = torch.nn.Sequential(
@@ -13,12 +14,12 @@ class ConvModel(torch.nn.Module):
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(2),
             Conv2d(64, 128, 3, padding=1),
-            torch.nn.Dropout(0.25),
+            torch.nn.Dropout(0.25 if dropout else 0.0),
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(2),
             Conv2d(128, 256, 3, padding=1),
             torch.nn.ReLU(),
-            torch.nn.Dropout(0.5)
+            torch.nn.Dropout(0.5 if dropout else 0.0)
         )
 
         # Certain neurons play a crucial role

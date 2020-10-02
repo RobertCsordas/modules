@@ -5,3 +5,9 @@ from .tuple_ff import TupleTaskFeedforward
 from .scan import ScanTask
 from .cifar10_class_removal import Cifar10ClassRemovalTask
 from .permuted_mnist import PermutedMnistTask
+from .scan_transformer import TransformerScanTask
+from .cifar10_mask_stability import Cifar10MaskStabilityTask
+from .cifar10_cos_distance import Cifar10GradCosDistanceTask
+from .dm_math import DeepmindMathTask
+from .cifar10_resnet_high_performance import Cifar10ResnetHPClassRemovalTask
+from .task import Task

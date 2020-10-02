@@ -1,22 +1,22 @@
-from typing import List, Dict
+from typing import List, Dict, Callable
 from .stat_tracker import StatTracker
 
 
-def construct_name(config_names: List[str], config: Dict[str, any]) -> str:
-    return "/".join([f"{c}_{config[c]}" for c in config_names])
+def construct_name(config_names: List[str], get_name: Callable[[str], str]) -> str:
+    return "/".join([f"{c}_{get_name(c)}" for c in config_names])
 
 
-def group(runs, config_names: List[str]) -> Dict[str, any]:
+def group(runs, config_names: List[str], get_config = lambda run, name: run.config[name]) -> Dict[str, any]:
     res = {}
     for r in runs:
-        cval = construct_name(config_names, r.config)
-        print(cval)
+        cval = construct_name(config_names, lambda name: get_config(r, name))
         if cval not in res:
             res[cval] = []
 
         res[cval].append(r)
 
     return res
+
 
 def calc_stat(group_of_runs: Dict[str, List[any]], filter) -> Dict[str, Dict[str, StatTracker]]:
     all_stats = {}

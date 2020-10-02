@@ -1,8 +1,13 @@
 import torch
-from typing import Dict, Tuple, Any, Union, Optional, Callable
+from typing import Dict, Tuple, Any, Union, Optional, Callable, Iterable, List
 from dataclasses import dataclass
 from layers import MaskedModule
 from framework.layers import gumbel_sigmoid
+from data_parallel import data_parallel
+from torch.nn.parallel import replicate, scatter
+from torch.nn.parallel.replicate import _broadcast_coalesced_reshape
+from torch.cuda._utils import _get_device_index
+
 
 @dataclass
 class ParameterPointer:
@@ -12,6 +17,9 @@ class ParameterPointer:
 
     def set(self, data: torch.Tensor):
         self.parent.__dict__[self.name] = data
+
+    def get(self) -> torch.Tensor:
+        return self.parent.__dict__[self.name]
 
 
 def append_update(target: Dict[str, Any], src: Dict[str, Any], prefix: str) -> Dict[str, Any]:
@@ -51,11 +59,18 @@ class MaskedModel(torch.nn.Module):
             append_update(res_ptrs, ptrs, name)
             append_update(res_params, params, name)
 
+        none_params = []
         for name, param in module._parameters.items():
+            if param is None:
+                none_params.append(name)
+                continue
+
             res_ptrs[name] = ParameterPointer(module, name, multimask_support)
             res_params[name] = param
 
         module._parameters.clear()
+        for n in none_params:
+            module._parameters[n] = None
 
         return res_ptrs, res_params
 
@@ -67,10 +82,17 @@ class MaskedModel(torch.nn.Module):
         else:
             return (mask >= 0).float()
 
+    def _count_params(self, params: Iterable[torch.Tensor]) -> int:
+        return sum(p.numel() for p in params)
+
     def __init__(self, model: torch.nn.Module, n_mask_sets: int, n_mask_samples: int, mask_loss_weight: float,
                  mask_filter: Callable[[str], bool] = lambda x: True, empty_init: float = 1):
         super().__init__()
+
+        self.model_allowed_to_train = True
         self.pointers, params = self.gather_and_remove_params(model)
+        self.param_names = list(sorted(self.pointers.keys()))
+        self.pointer_values = [self.pointers[n] for n in self.param_names]
         self.model_parameters = torch.nn.ParameterDict(params)
         self.masks = torch.nn.ModuleList([torch.nn.ParameterDict({k: torch.nn.Parameter(torch.full_like(v, empty_init))
                                          for k, v in self.model_parameters.items() if mask_filter(k)})
@@ -86,12 +108,18 @@ class MaskedModel(torch.nn.Module):
         print(f"Found module parameters: {list(self.model_parameters.keys())}")
         print(f"Masking is applied to paramteres: {self.masked_params}")
 
+        n_total = self._count_params(self.model_parameters.values())
+        n_masked = self._count_params(self.masks[0].values())
+
+        print(f"Masing {n_masked} out of {n_total} parameters ({n_masked*100/n_total:.1f} %)")
+
         single_sample_params = [k for k in self.masked_params if not self.pointers[k].multimask_support]
 
-        if single_sample_params and n_mask_samples != 1:
-            print("!!!!!!!!!!!!!!!!!!!!!!!! ERROR !!!!!!!!!!!!!!!!!!!!!!!!")
+        if single_sample_params:
+            is_ok = n_mask_samples == 1
+            print(f"!!!!!!!!!!!!!!!!!!!!!!!! {'WARNING' if is_ok else 'ERROR'} !!!!!!!!!!!!!!!!!!!!!!!!")
             print(f"The following parameters support only single masks {single_sample_params}.")
-            assert False
+            assert is_ok
 
         self.model = model
 
@@ -110,9 +138,12 @@ class MaskedModel(torch.nn.Module):
         else:
             return self.sample_mask(self.active_masks[name], self.n_mask_samples if self.training else 0)
 
+    def is_masked(self, name: str):
+        return name in self.masked_params
+
     def update_params(self):
         for name, ptr in self.pointers.items():
-            if self.masking_enabled and name in self.masked_params:
+            if self.masking_enabled and self.is_masked(name):
                 ptr.set(self.model_parameters[name] * self.get_mask(name))
             else:
                 ptr.set(self.model_parameters[name])
@@ -123,11 +154,58 @@ class MaskedModel(torch.nn.Module):
         self.active = mask_set
         self.update_params()
 
+    def replicate_module(self, module: torch.nn.Module, devices: List[int]) -> List[torch.nn.Module]:
+        assert self.n_mask_samples % len(devices) == 0
+        copies = replicate(module, devices)
+
+        def walk(module: torch.nn.Module, copy: torch.nn.Module):
+            module_map = {id(module): copy}
+            for name, ref in module._modules.items():
+                module_map.update(walk(ref, getattr(copy, name)))
+
+            return module_map
+
+        devices = [_get_device_index(d) for d in devices]
+
+        # Copy the custom parameters
+        all_params = [p.get() for p in self.pointer_values]
+
+        if (not self.masking_enabled) or (not self.training):
+            scattered = _broadcast_coalesced_reshape(all_params, devices)
+        else:
+            # Here is more complicated, because there might be non-masked parameters which has to be handled in the
+            # usual way
+            masked_indices = [i for i, n in enumerate(self.param_names) if self.is_masked(n)]
+            simple_indices = [i for i, n in enumerate(self.param_names) if not self.is_masked(n)]
+
+            masked_params = scatter([all_params[i] for i in masked_indices], devices)
+            simple_params = _broadcast_coalesced_reshape([all_params[i] for i in simple_indices], devices)
+
+            scattered = [[None] * len(all_params) for _ in devices]
+            for d in range(len(devices)):
+                for mi, mp in zip(masked_indices, masked_params[d]):
+                    scattered[d][mi] = mp
+
+                for si, sp in zip(simple_indices, simple_params[d]):
+                    scattered[d][si] = sp
+
+        for i, c in enumerate(copies):
+            device_map = walk(module, c)
+            for j, p in enumerate(self.pointer_values):
+                setattr(device_map[id(p.parent)], p.name, scattered[i][j])
+
+            self.update_rnn_params(c)
+
+        return copies
+
     def __call__(self, *args, **kwargs):
         if self.masking_enabled:
             self.update_params()
 
-        return self.model(*args, **kwargs)
+        if torch.cuda.device_count() > 1:
+            return data_parallel(self.model, args, self.replicate_module, module_kwargs=kwargs)
+        else:
+            return self.model(*args, **kwargs)
 
     def to(self, *args, **kwargs):
         super().to(*args, **kwargs)
@@ -167,3 +245,13 @@ class MaskedModel(torch.nn.Module):
 
     def set_temporary_masks(self, temporary_masks: Optional[Masks]):
         self.temporary_masks = temporary_masks
+
+    def train(self, mode: bool = True):
+        res = super().train(mode)
+        if mode and not self.model_allowed_to_train:
+            self.model.train(False)
+        return res
+
+    def set_model_to_eval(self, eval: bool = True):
+        self.model_allowed_to_train = not eval
+        self.model.eval()

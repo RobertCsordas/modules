@@ -3,6 +3,7 @@ import torch
 from operator import mul
 from functools import reduce
 from typing import List
+import warnings
 
 
 class VarLengthCollate:
@@ -39,7 +40,11 @@ class VarLengthCollate:
         if isinstance(batch[0], dict):
             return {k: self([b[k] for b in batch]) for k in batch[0].keys()}
         elif isinstance(batch[0], np.ndarray):
-            return self([torch.from_numpy(a) for a in batch])
+            with warnings.catch_warnings():
+                # If the source data is mmapped from a file, from_numpy will throw a warning that it is readonly.
+                # However it does not matter, since all batches will be merged anyway, which copies the data.
+                warnings.filterwarnings("ignore", category=UserWarning)
+                return self([torch.from_numpy(a) for a in batch])
         elif torch.is_tensor(batch[0]):
             return self._merge_var_len_array(batch)
         elif isinstance(batch[0], (int, float)):

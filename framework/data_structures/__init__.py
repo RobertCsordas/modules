@@ -1,2 +1,2 @@
 from .dotdict import DotDict
-from .vocabulary import WordVocabulary
+from .vocabulary import WordVocabulary, CharVocabulary

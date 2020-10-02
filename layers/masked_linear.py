@@ -12,10 +12,7 @@ class Linear(MaskedModule):
         self.in_features = in_features
         self.out_features = out_features
         self.weight = torch.nn.Parameter(torch.Tensor(out_features, in_features))
-        if bias:
-            self.bias = torch.nn.Parameter(torch.Tensor(out_features))
-        else:
-            self.register_parameter('bias', None)
+        self.bias = torch.nn.Parameter(torch.Tensor(out_features)) if bias else None
         self.reset_parameters()
 
     def reset_parameters(self):

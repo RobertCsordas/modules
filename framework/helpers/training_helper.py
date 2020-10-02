@@ -38,7 +38,8 @@ class TrainingHelper:
         self.start()
 
     def create_parser(self):
-        self.arg_parser = ArgumentParser(get_train_dir=lambda x: os.path.join("save", x.name))
+        self.arg_parser = ArgumentParser(get_train_dir=lambda x: os.path.join("save", x.name) if x.name is not None
+                                         else None)
         self.arg_parser.add_argument("-name", type=str, help="Train dir name")
         self.arg_parser.add_argument("-reset", default=False, help="reset training - ignore saves", save=False)
         self.arg_parser.add_argument("-log", default="tb")
@@ -97,11 +98,13 @@ class TrainingHelper:
         self.state = DotDict()
         self.state.iter = 0
 
-        self.summary = constructor(save_dir=os.path.join("save", self.opt.name),
+        assert self.opt.name is not None or self.use_wandb, "Either name must be specified or W&B should be used"
+
+        self.summary = constructor(save_dir=os.path.join("save", self.opt.name) if self.opt.name is not None else None,
                                         use_tb=self.use_tensorboard,
                                         use_wandb=self.use_wandb,
                                         wandb_init_args=
-                                            dict(project=self.wandb_project_name, name=self.opt.name,
+                                            dict(project=self.wandb_project_name,
                                                  config=self.arg_parser.to_dict()),
                                         wandb_extra_config={
                                             "experiment_name": self.opt.name
@@ -121,10 +124,13 @@ class TrainingHelper:
             while True:
                 time.sleep(100)
 
+    def save(self):
+        self.saver.save(iter=self.state.iter)
+
     def finish(self):
         self.summary.finish()
         if self.is_sweep or self.opt.save_interval is None:
-            self.saver.save(iter=self.state.iter)
+            self.save()
 
         self.wait_for_termination()
 

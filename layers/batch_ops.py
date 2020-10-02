@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from typing import Optional
+from typing import Optional, Callable
 
 
 def batch_matmul(input: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
@@ -29,27 +29,67 @@ def batch_matmul(input: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
     return res.view(input.shape[0], -1)
 
 
-def batch_bias_add(input: torch.Tensor, bias: torch.Tensor) -> torch.Tensor:
+def batch_elementwise(input: torch.Tensor, param: torch.Tensor,
+                      op: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+                      input_batch_dim: int = 0, pndim: int = 1) -> torch.Tensor:
+    """
+    Do elementwise operation in groups.
+
+    :param input: input, any shape, [..., Ci, Cj, ...]
+    :param param: the parameter, shape [N, Ci, Cj....], in which case B % N == 0, or [Ci, Cj....]
+    :param input_batch_dim: which dimension is the batch in the input
+    :param op: the operation to perform
+    :param pndim: number of parameter dimensions without batch
+    :return: input with the op performed, the same shape as input
+    """
+
+    if param.ndim == pndim+1:
+        # If the param is batched, check if it the batch size is 1
+        param = param.squeeze(0)
+
+    if param.ndim == pndim:
+        # If the param has no batch, do the normal op
+        return op(input, param)
+
+    assert param.ndim == pndim + 1
+    assert input.shape[input_batch_dim] % param.shape[0] == 0
+
+    input_r = input.view(*input.shape[:input_batch_dim], param.shape[0], -1, *input.shape[input_batch_dim+1:])
+
+    param_r = param.view(*([1]*input_batch_dim), param.shape[0], *([1]*(input_r.ndim - input_batch_dim - param.ndim)),
+                         *param.shape[1:])
+
+    return op(input_r, param_r).view_as(input)
+
+
+def batch_bias_add(*args, **kwargs) -> torch.Tensor:
     """
     Batch add bias to the inputs.
 
-    :param input: input, shape [B, Ci]
-    :param bias: bias, shape [N, Ci], in which case B % N == 0, or [Ci]
-    :return: input with added bias, shape [B, Ci]
+    For more details, see batch_elementwise
     """
 
-    assert input.ndim == 2
+    return batch_elementwise(*args, op = lambda a,b: a+b, **kwargs)
 
-    if bias.ndim == 2:
-        bias = bias.squeeze(0)
 
-    if bias.ndim == 1:
-        return input + bias
+def batch_const_mul(*args, **kwargs) -> torch.Tensor:
+    """
+    Batch multiplies bias to the inputs.
 
-    assert bias.ndim == 2
-    assert input.shape[0] % bias.shape[0] == 0
+    For more details, see batch_elementwise
+    """
 
-    return (input.view(bias.shape[0], -1, input.shape[-1]) + bias.unsqueeze(1)).view_as(input)
+    return batch_elementwise(*args, op = lambda a,b: a*b, **kwargs)
+
+
+def batch_const_div(*args, **kwargs) -> torch.Tensor:
+    """
+    Batch multiplies bias to the inputs.
+
+    For more details, see batch_elementwise
+    """
+
+    return batch_elementwise(*args, op = lambda a,b: a/b, **kwargs)
 
 
 def batch_conv2d(input: torch.Tensor, filter: torch.Tensor, bias: Optional[torch.Tensor] = None,

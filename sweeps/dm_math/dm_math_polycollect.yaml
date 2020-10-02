@@ -1,0 +1,43 @@
+program: main.py
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - ${args}
+method: grid
+metric:
+  name: validation/mean_accuracy
+  goal: maximize
+parameters:
+  name:
+    value: dm_math_polycollect
+  log:
+    value: wandb
+  profile:
+    value: deepmind_math
+  dm_math.task:
+    value: polynomials__collect
+  mask_loss_weight:
+    value: 1e-6
+  step_per_mask:
+    value: 50000
+  mask_lr:
+    value: 0.02
+  batch_size:
+    value: 128
+  mask_batch_size:
+    value: 256
+  sweep_id_for_grid_search:
+    distribution: categorical
+    values:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+  test_interval:
+    value: 1000
+  lr_warmup:
+    value: 5000
+  stop_after:
+    value: 200000

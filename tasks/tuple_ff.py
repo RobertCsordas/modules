@@ -4,7 +4,6 @@ from models import FeedforwardModel
 import torch
 
 
-
 class TupleTaskFeedforward(TupleTask):
     model_interface: FFTupleArithmeticDatasetInterface
 

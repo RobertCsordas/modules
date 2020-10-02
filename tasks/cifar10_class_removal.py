@@ -1,23 +1,24 @@
-from .task import Task
+from .task import Task, Result
 import dataset
 from models import ConvModel
 from interfaces import ConvClassifierInterface
 import torch
+import torch.utils.data
 import framework
 from framework.visualize import plot
+from typing import Dict, Any, List
 
 
 class Cifar10ClassRemovalTask(Task):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def create_datasets(self):
         self.batch_dim = 0
         self.train_set = dataset.image.CIFAR10("train")
         self.valid_sets.iid = dataset.image.CIFAR10("valid")
+        self.mask_classes = list(range(10))
 
     def create_model(self):
-        return ConvModel(self.train_set.in_channels(), self.train_set.out_channels())
+        return ConvModel(self.train_set.in_channels(), self.train_set.out_channels(),
+                         dropout=self.helper.opt.cnn.dropout)
 
     def create_model_interface(self):
         self.model_interface = ConvClassifierInterface(self.model)
@@ -45,22 +46,37 @@ class Cifar10ClassRemovalTask(Task):
         else:
             params = self.model.masks[stage].parameters()
 
-        self.set_optimizer(torch.optim.Adam(params, self.helper.opt.mask_lr or self.helper.opt.lr))
+        self.set_optimizer(torch.optim.Adam(params, self.get_mask_lr()))
 
     def draw_confusion_heatmap(self, hm: torch.Tensor) -> framework.visualize.plot.Heatmap:
         return plot.Heatmap(hm, "predicted", "real", round_decimals=2, x_marks=self.train_set.class_names,
                      y_marks=self.train_set.class_names)
 
+    def plot(self, res: Result) -> Dict[str, Any]:
+        # Disable periodically plotting the confusion matrices because matplotlib is very slow for big ones
+        plots = super().plot(res)
+        return {k: v for k, v in plots.items() if not k.endswith("/confusion")}
+
+    def log_confusion_matrices(self):
+        self.helper.summary.log({f"validation/{k}": v for k, v in self.validate().items() if k.endswith("/confusion")})
+
+    def create_restricted_train_set(self, restrict: List[int]) -> torch.utils.data.Dataset:
+        return type(self.train_set)("train", restrict=restrict)
+
     def post_train(self):
-        for stage, split in enumerate(["baseline"] + self.train_set.class_names):
+        self.log_confusion_matrices()
+        self.prepare_model_for_analysis()
+
+        for stage, mask_id in enumerate([-1]+self.mask_classes):
+            split = "baseline" if stage==0 else self.train_set.class_names[mask_id]
+
             start = self.helper.state.iter
 
             self.mask_grad_norm.clear()
             self.model.set_active(stage)
             self.class_removal_init_masks_and_optim(stage)
 
-            set = dataset.image.CIFAR10("train",
-                                        restrict=[i for i in range(self.train_set.n_classes) if i != (stage - 1)])
+            set = self.create_restricted_train_set([i for i in range(self.train_set.n_classes) if i != mask_id])
             self.create_validate_on_train(set)
             loader = self.create_train_loader(set, 1234)
 
@@ -90,7 +106,7 @@ class Cifar10ClassRemovalTask(Task):
                 plots = self.plot(res)
                 plots.update({f"analyzer/{split}/{k}": v for k, v in plots.items()})
 
-                if self.helper.state.iter % 1000 == 0:
+                if self.helper.state.iter % 1000 == 0 and self.helper.opt.analysis.plot_masks:
                     plots.update({f"class_removal_masks/{split}/{k}": v for k, v in
                                   self.plot_selected_masks([0, stage] if stage > 0 else [0]).items()})
 

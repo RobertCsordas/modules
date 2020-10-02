@@ -57,7 +57,7 @@ for grp, stats in all_stats.items():
     print("-------------------- GROUP --------", grp)
     print(stats.keys())
 
-    fig = plt.figure(figsize=[4.5,1.4])
+    fig = plt.figure(figsize=[4.5,1.2])
 
     keys = list(sorted({k.split("/")[1] for k in stats.keys()}))
     keys = [k for k in keys if k!="all"]
@@ -82,7 +82,8 @@ for grp, stats in all_stats.items():
     plt.ylabel("Shared weights [\%]")
     plt.ylim(0,100)
     plt.legend(legend, ncol=2, loc="upper center")
+    fig.axes[0].yaxis.set_label_coords(-0.115, 0.415)
 
     f = f"out/addmul_sharing/{grp}.pdf"
     os.makedirs(os.path.dirname(f), exist_ok=True)
-    fig.savefig(f, bbox_inches='tight')
+    fig.savefig(f, bbox_inches='tight', pad_inches = 0.01)

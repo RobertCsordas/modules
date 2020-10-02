@@ -6,8 +6,7 @@ import functools
 import torch
 import torch.utils.data
 import operator
-from typing import List, Tuple, Optional, Dict, Any
-from tqdm import tqdm
+from typing import List, Tuple, Optional, Dict, Any, Callable
 from dataclasses import dataclass
 import torch.nn.functional as F
 
@@ -113,7 +112,8 @@ class ImageClassificationDataset(torch.utils.data.Dataset):
             self.data = self.data.filter(filter)
 
     def __init__(self, set: str, cache: str = "./cache", valid_split_size: float = 0.2,
-                 normalize: bool = True, restrict:Optional[List[int]] = None):
+                 normalize: bool = True, restrict:Optional[List[int]] = None,
+                 augment: Callable[[np.ndarray], np.ndarray] = lambda x: x):
 
         cache = os.path.join(cache, self.__class__.__name__)
         assert hasattr(self, "n_classes"), "n_classes must be defined for all classification datasets"
@@ -133,9 +133,11 @@ class ImageClassificationDataset(torch.utils.data.Dataset):
         if normalize:
             self.data = self.data.normalize(self.mean_tensor, self.std_tensor)
 
+        self.augment = augment
+
     def __getitem__(self, item: int) -> Dict[str, any]:
         return {
-            "image": self.data.images[item],
+            "image": self.augment(self.data.images[item]),
             "label": int(self.data.labels[item])
         }
 

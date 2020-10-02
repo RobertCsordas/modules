@@ -1,7 +1,7 @@
 import torch.utils.data
 import numpy as np
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 from .helpers import split_digits
 
 
@@ -42,19 +42,27 @@ class TupleArithmetic(torch.utils.data.Dataset):
     DATA: Dict[str, TupleArithmeticData] = {}
     SETS = ["train", "test", "valid"]
 
-    def __init__(self, set: str, n_digits: int, n_tuples: int, n_samples: int, op: str = "add"):
+    def __init__(self, set: str, n_digits: int, n_tuples: int, n_samples: int, op: str = "add",
+                 ranges: Dict[int, Tuple[int,int]] = {}):
         assert set in self.SETS
         self.n_digits = n_digits
         self.n_tuples = n_tuples
         self.n_samples = n_samples
         self.maxnum = 10 ** n_digits
         self.op = op
-        self.id = f"{set}_{n_digits}_{n_tuples}_{n_samples}_{op}"
+        self.id = f"{set}_{n_digits}_{n_tuples}_{n_samples}_{op}"+"_".join(f"{i}_{ranges[i][0]}_{ranges[i][1]}"
+                                                                           for i in sorted(ranges.keys()))
         self.set_index = self.SETS.index(set)
+        self.ranges = ranges
+
+        for r in self.ranges.values():
+            assert 0 <= r[0] < r[1] <= self.maxnum
 
         self.data = self.DATA.get(self.id)
         if self.data is None:
             TupleArithmetic.DATA[self.id] = self.data = self.generate(set)
+        else:
+            assert False, self.id
 
     def generate(self, set: str) -> TupleArithmeticData:
         assert self.op in ["add", "mul"]
@@ -62,7 +70,12 @@ class TupleArithmetic(torch.utils.data.Dataset):
 
         seed = np.random.RandomState(0x12345678 + self.SETS.index(set))
 
-        inputs = seed.randint(0, self.maxnum, (self.n_samples, self.n_tuples, 2))
+        i_list = []
+        for t in range(self.n_tuples):
+            r = self.ranges.get(t, (0, self.maxnum))
+            i_list.append(seed.randint(*r, (self.n_samples, 1, 2)))
+
+        inputs = np.concatenate(i_list, 1)
         outputs = op_fn(inputs[:, :, 0], inputs[:, :, 1]) % self.maxnum
 
         return TupleArithmeticData(inputs, outputs)

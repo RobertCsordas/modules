@@ -3,13 +3,21 @@ from typing import Dict, Any, Union
 
 
 class DotDefaultDict(defaultdict):
-    __getattr__ = dict.get
+    def __getattr__(self, item):
+        if item not in self:
+            raise AttributeError
+        return self.get(item)
+
     __setattr__ = defaultdict.__setitem__
     __delattr__ = defaultdict.__delitem__
 
 
 class DotDict(dict):
-    __getattr__ = dict.get
+    def __getattr__(self, item):
+        if item not in self:
+            raise AttributeError
+        return self.get(item)
+
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 

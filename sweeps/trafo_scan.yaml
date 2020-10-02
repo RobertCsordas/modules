@@ -1,0 +1,36 @@
+program: main.py
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - ${args}
+method: grid
+metric:
+  name: validation/mean_accuracy
+  goal: maximize
+parameters:
+  name:
+    value: trafo_scan
+  log:
+    value: wandb
+  profile:
+    value: trafo_scan
+  stop_after:
+    value: 25000
+  step_per_mask:
+    value: 25000
+  mask_loss_weight:
+    value: 0.0006
+  sweep_id_for_grid_search:
+    distribution: categorical
+    values:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
