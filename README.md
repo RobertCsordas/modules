@@ -2,7 +2,10 @@
 
 The official repository for our paper "Are Neural Nets Modular? Inspecting Functional Modularity Through Differentiable Weight Masks".
 
-## Installation
+Spotlight presentation: https://www.youtube.com/watch?v=l70-upLWfLg  
+Paper: https://arxiv.org/abs/2010.02066
+
+## Setup
 
 This project requires Python 3 and PyTorch 1.6.
 
