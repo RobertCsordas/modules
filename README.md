@@ -23,6 +23,14 @@ https://docs.wandb.com/quickstart.
 
 For plotting, LaTeX is required (to avoid Type 3 fonts and to render symbols). Installation is OS specific.
 
+### Downloading data
+
+All datasets are downloaded automatically except the Mathematics Dataset which is hosted in Google Cloud and one has to log in with his/her Google account to be able to access it. Download the .tar.gz file manually from here:
+
+https://console.cloud.google.com/storage/browser/mathematics-dataset?pli=1
+
+Copy it to the ``cache/dm_math/`` folder. You should have a ``cache/dm_math/mathematics_dataset-v1.0.tar.gz`` file in the project folder if you did everyhing correctly. 
+
 ## Usage
 
 The code makes use of Weights and Biases for experiment tracking. In the ```sweeps``` directory, we provide sweep configurations for all experiments we have performed. The sweeps are officially meant for hyperparameter optimization, but we use them to run multiple configurations and seeds.
