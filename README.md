@@ -35,7 +35,7 @@ Copy it to the ``cache/dm_math/`` folder. You should have a ``cache/dm_math/math
 
 The code makes use of Weights and Biases for experiment tracking. In the ```sweeps``` directory, we provide sweep configurations for all experiments we have performed. The sweeps are officially meant for hyperparameter optimization, but we use them to run multiple configurations and seeds.
 
-To reproduce our results, start a sweep for each of the YAML files in the ```sweeps``` directory. Run wandb agent for each of them in the main directory. This will run all the experiments, and they will be displayed on the W&B dashboard.
+To reproduce our results, start a sweep for each of the YAML files in the ```sweeps``` directory. Run wandb agent for each of them in the _root directory of the project_. This will run all the experiments, and they will be displayed on the W&B dashboard. More details on how to run W&B sweeps can be found at https://docs.wandb.com/sweeps/quickstart. If you want to use a Linux cluster to run the experiments, you might find https://github.com/robertcsordas/cluster_tool useful.
 
 The task ```sweeps/dm_math/dm_math_polycollect.yaml``` needs two 16Gb GPUs to run. In any of the experiments won't fit on a single GPU, it is possible to run them on multile (data parallel) by specifying multiple devices in CUDA_VISIBLE_DEVICE.
 ### Re-creating plots from the paper
