@@ -4,7 +4,7 @@ from interfaces import Result, ModelInterface
 import torch
 import torch.utils.data
 from tqdm import tqdm
-from typing import Dict, Any, Iterable, Tuple, Optional, List, Union, Callable
+from typing import Dict, Any, Iterable, Tuple, Optional, List, Union, Callable, Set
 from grad_norm import GradNormTracker
 import functools
 from draw import draw_mask, draw_mask_histogram
@@ -12,6 +12,9 @@ import os
 import re
 from dataclasses import dataclass
 import optimizer
+from masked_model import Masks
+import math
+import numpy as np
 
 
 @dataclass
@@ -372,20 +375,80 @@ class Task:
                     for i, m in enumerate(indices)})
         return res
 
-    def do_inverse_mask_test(self, stage: int, split: Optional[str] = None) -> Dict[str, Any]:
-        def inverse_mask_test_run(prefix: str) -> Dict[str, Any]:
-            plots = self.validate()
+    def run_final_iid_validation(self, prefix: str) -> Dict[str, Any]:
+        plots = self.validate()
 
-            test, _ = self.validate_on(self.valid_sets.iid, self.valid_loaders.iid)
-            if hasattr(test, "confusion"):
-                self.export_tensor(f"{prefix}/confusion", test.confusion)
+        test, _ = self.validate_on(self.valid_sets.iid, self.valid_loaders.iid)
+        if hasattr(test, "confusion"):
+            self.export_tensor(f"{prefix}/confusion", test.confusion)
 
-            return {f"{prefix}/{k}": v for k, v in plots.items()}
+        return {f"{prefix}/{k}": v for k, v in plots.items()}
 
+    def get_half_mask_masked_layer_names(self, masks: Masks) -> List[Set[str]]:
+        layers = list(sorted(masks.keys()))
+        k = math.ceil(len(layers)/2)
+        n_pos = math.factorial(len(layers)) / (math.factorial(k) * math.factorial(len(layers)-k))
+        m = min(n_pos, 5)
+
+        res = set()
+        while len(res) < m:
+            c=np.random.choice(len(layers), k, replace=False)
+            c=list(sorted(c))
+            res.add(sum([v * (len(layers) ** i) for i,v in enumerate(c)]))
+
+        return [{layers[((r//(len(layers) ** i)) % len(layers))] for i in range(k)} for r in res]
+
+    def do_half_mask_test(self, stage: int, split: Optional[str] = None) ->  Dict[str, Any]:
         split = split or f"split_{stage}"
 
-        self.model.set_temporary_masks(self.model.get_masks(stage).invert())
-        res = inverse_mask_test_run(f"inverse_mask_test/{split}")
+        masks = self.model.get_masks(stage)
+
+        res = {}
+        for i, layers in enumerate(self.get_half_mask_masked_layer_names(masks)):
+            temp_masks = Masks({k: masks[k] for k in layers})
+            inverse_temp_masks = Masks({k: v for k, v in masks.items() if k not in layers})
+
+            print(f"Half-mask test, stage: {split}, iteration {i}: keeping masks for the following layers "
+                  f"({len(layers)} out of {len(masks)}): {layers}")
+            print(f"Inverse: masking {len(inverse_temp_masks)} out of {len(masks)}: {set(inverse_temp_masks.keys())}")
+
+            self.model.set_temporary_masks(temp_masks)
+
+            res[f"half_mask_test/normal/{split}/iter_{i}/iid/accuracy"] = \
+                self.validate_on(self.valid_sets.iid, self.valid_loaders.iid)[0].accuracy
+
+            self.model.set_temporary_masks(inverse_temp_masks)
+            res[f"half_mask_test/inverse/{split}/iter_{i}/iid/accuracy"] = \
+                self.validate_on(self.valid_sets.iid, self.valid_loaders.iid)[0].accuracy
+
+        self.model.set_temporary_masks(None)
+        return res
+
+    def inv_mask_test_get_exluded(self) -> Set[str]:
+        raise NotImplementedError()
+
+    def do_inverse_mask_test(self, stage: int, split: Optional[str] = None) -> Dict[str, Any]:
+        split = split or f"split_{stage}"
+
+        m = self.model.get_masks(stage).invert()
+        u = {}
+        if self.helper.opt.inv_mask_exclude_io == "fullmask":
+            print("Inv mask exclude mode: copy full masks")
+            ctrl = self.model.get_masks(0)
+            excluded = self.inv_mask_test_get_exluded()
+            u = {k: ctrl[k] for k in m.keys() if k in excluded}
+        elif self.helper.opt.inv_mask_exclude_io == "ones":
+            print("Inv mask exclude mode: fill with ones")
+            excluded = self.inv_mask_test_get_exluded()
+            u = {k: torch.ones_like(v) for k, v in m.items() if k in excluded}
+
+        for k in u.keys():
+            assert k in m
+        m.update(u)
+
+        print(f"Inv mask test. Masks: {list(m.keys())}, fallback: {list(u.keys())}")
+        self.model.set_temporary_masks(m)
+        res = self.run_final_iid_validation(f"inverse_mask_test/{split}")
         self.model.set_temporary_masks(None)
         return res
 
@@ -429,9 +492,11 @@ class Task:
         elif dataset is not None:
             self.replace_valid_set("iid", dataset)
 
+    def plot_stage_results(self, index: int, name: str) -> Dict[str, Any]:
+        return {f"analysis_results/{name}/{k}": v for k, v in self.validate().items()}
+
     def analysis_stage_finished(self, index: int, name: str):
-        plots = {f"analysis_results/{name}/{k}": v for k, v in self.validate().items()}
-        self.helper.summary.log(plots)
+        self.helper.summary.log(self.plot_stage_results(index, name))
         self.export_masks(index)
 
     def analysis_periodic_plot(self, index: int, name: str) -> Dict[str, Any]:

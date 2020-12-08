@@ -34,7 +34,10 @@ class AddMulTask(Task):
         test, _ = self.validate_on(self.valid_sets.iid, self.valid_loaders.iid)
         self.export_tensor(f"confusion/{name}", test.confusion)
         self.export_masks(index)
-        self.helper.summary.log(self.do_inverse_mask_test(index, name))
+        log = self.do_inverse_mask_test(index, name)
+        if index==0:
+            log.update(self.do_half_mask_test(index, name))
+        self.helper.summary.log(log)
 
     def analysis_periodic_plot(self, index: int, name: str) -> Dict[str, Any]:
         return self.plot_masks(index)

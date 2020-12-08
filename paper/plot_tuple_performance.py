@@ -28,10 +28,29 @@ def plot_one(stats):
         plt.bar([3 * r + t for r in range(len(names))], means, yerr=std, align='center')
 
     plt.xticks([3 * r + 0.5 for r in range(len(names))], names)
+
+    print("\\begin{tabular}{l|c|cc|cc}")
+    print("\\toprule")
+    print(" & ".join([""] + names) + " \\\\")
+    print("\\midrule")
+
+    for t in range(2):
+        this_stats = [stats[f"{plots[n]}{t}"].get() for n in names]
+        row = [f"Pair {t+1}"]
+
+        for m, s in zip([s.mean * 100 for s in this_stats], [s.std * 100 for s in this_stats]):
+            row.append(f"${m:.0f} \pm {s:.1f}$")
+
+        print(" & ".join(row) + " \\\\")
+
+    print("\\bottomrule")
+    print("\end{tabular}")
+
     return fig
 
 
 def plot_all(name, groups):
+    print(f"********************************** {name} **********************************")
     stats = calc_stat(groups, lambda k: (k.startswith("final_accuracy/") and '/iid/accuracy/' in k and '/tuple/' in k) or (k.startswith("inverse_mask_test/") and '/iid/accuracy/' in k))
     for k, s in stats.items():
         print("---------------------", k)
@@ -39,6 +58,7 @@ def plot_all(name, groups):
            print(n)
 
     for k, s in stats.items():
+        print(f"Generating file {k}.pdf")
         fig = plot_one(s)
         fname = os.path.join(BASE_DIR, name, f"{k}.pdf")
         os.makedirs(os.path.dirname(fname), exist_ok=True)
@@ -75,12 +95,46 @@ def plot_both(ff, rnn):
     fig.axes[0].yaxis.set_label_coords(-0.12,0.4)
     fig.savefig(fname, bbox_inches='tight', pad_inches = 0.01)
 
-rnn_runs = lib.get_runs(["tuple_rnn"])
-feedforward_runs = lib.get_runs(["tuple_feedforward_big"])
+    print("\\begin{tabular}{ll|c|cc|cc}")
+    print("\\toprule")
+    print(" & ".join(["", ""] + names)+" \\\\")
+    print("\\midrule")
 
-feedforward_runs = group(feedforward_runs, ["layer_sizes"])
-rnn_runs = group(rnn_runs, ["tuple.mode"])
-plot_all("rnn", rnn_runs)
-plot_all("feedforward", feedforward_runs)
+    row = ["\\multirow{2}{*}{FNN}"]
+    for t in range(2):
+        this_stats = [ff_stats[f"{plots[n]}{t}"].get() for n in names]
+        row.append(f"Pair {t+1}")
 
-plot_both(feedforward_runs["layer_sizes_2000,2000,2000,2000"], rnn_runs["tuple.mode_together"])
+        for m,s in zip([s.mean * 100 for s in this_stats], [s.std * 100 for s in this_stats]):
+            row.append(f"${m:.0f} \pm {s:.1f}$")
+
+        print(" & ".join(row)+" \\\\")
+        row=[""]
+
+    print("\\midrule")
+    row = ["\\multirow{2}{*}{LSTM}"]
+    for t in range(2):
+        this_stats = [rnn_stats[f"{plots[n]}{t}"].get() for n in names]
+        row.append(f"Pair {t+1}")
+
+        for m, s in zip([s.mean * 100 for s in this_stats], [s.std * 100 for s in this_stats]):
+            row.append(f"${m:.0f} \pm {s:.1f}$")
+
+        print(" & ".join(row)+" \\\\")
+        row=[""]
+
+    print("\\bottomrule")
+    print("\end{tabular}")
+
+def plot_runs(rnn_runs, feedforward_runs):
+    feedforward_runs = group(feedforward_runs, ["layer_sizes"])
+    rnn_runs = group(rnn_runs, ["tuple.mode"])
+    plot_all("rnn", rnn_runs)
+    plot_all("feedforward", feedforward_runs)
+    print(f"********************************** all **********************************")
+    plot_both(feedforward_runs["layer_sizes_2000,2000,2000,2000"], rnn_runs["tuple.mode_together"])
+
+print("====================== Normal ======================")
+plot_runs(lib.get_runs(["tuple_rnn"]), lib.get_runs(["tuple_feedforward_big"]))
+print("====================== First full mask ======================")
+plot_runs(lib.get_runs(["tuple_rnn_first_full_mask"]), lib.get_runs(["tuple_feedforward_big_first_full_mask"]))

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import os
 import lib
 from lib import StatTracker
@@ -10,6 +9,8 @@ import numpy as np
 import itertools
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from lib.common import group
+
+runs = lib.get_runs(["cifar10"])
 
 BASE_DIR = "out/cifar10_confusion/"
 shutil.rmtree(BASE_DIR, ignore_errors=True)

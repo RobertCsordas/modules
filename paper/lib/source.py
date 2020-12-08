@@ -5,7 +5,6 @@ from typing import Dict
 
 from gql import gql
 
-
 def get_sweep_table(api: wandb.Api, project: str) -> Dict[str, str]:
     QUERY = gql('''       
     query Sweep($project: String!, $entity: String) {
@@ -64,7 +63,6 @@ def invert_sweep_id_table(t: Dict[str, str]) -> Dict[str, str]:
 
 sweep_table = None
 
-
 def get_runs(names: List[str], filters = {}) -> List[wandb.apis.public.Run]:
     global sweep_table
     api = wandb.Api()
@@ -80,8 +78,10 @@ def get_runs(names: List[str], filters = {}) -> List[wandb.apis.public.Run]:
 
     sweep_id_list = [sweep_table[n] for n in names]
     filter = {"sweep": {"$in": sweep_id_list}}
+    filter.update(filters)
     res = list(api.runs(project, filter))
 
+    assert len(res)>0, "Runs not found."
     assert all(r.state == "finished" for r in res)
     print(f"Querying runs {names}: {len(res)} runs loaded")
     assert len(res) > 0

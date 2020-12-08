@@ -16,6 +16,9 @@ class Cifar10ResnetHPClassRemovalTask(Cifar10ClassRemovalTask):
         self.enable_grad_clip = False
         return ResNet110(self.train_set.in_channels(), self.train_set.out_channels())
 
+    # def get_n_mask_samples(self):
+    #     return 8
+    #
     def create_normalizer(self, scale: float = 1):
         s = lambda *args: tuple(a*scale for a in args)
         return transforms.Normalize(s(0.4914, 0.4822, 0.4465), s(0.2023, 0.1994, 0.2010))

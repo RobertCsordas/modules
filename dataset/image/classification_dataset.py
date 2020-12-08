@@ -7,6 +7,7 @@ import torch
 import torch.utils.data
 import operator
 from typing import List, Tuple, Optional, Dict, Any, Callable
+from tqdm import tqdm
 from dataclasses import dataclass
 import torch.nn.functional as F
 

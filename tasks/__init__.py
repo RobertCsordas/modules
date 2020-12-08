@@ -11,3 +11,4 @@ from .cifar10_cos_distance import Cifar10GradCosDistanceTask
 from .dm_math import DeepmindMathTask
 from .cifar10_resnet_high_performance import Cifar10ResnetHPClassRemovalTask
 from .task import Task
+from .tuple_ff_copyweight import TupleFeedforwardCopyweightTask

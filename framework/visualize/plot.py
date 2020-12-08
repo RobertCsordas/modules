@@ -11,10 +11,10 @@ import sys
 import itertools
 import PIL
 
-
 wandb = None
 plt = None
 make_axes_locatable = None
+
 
 def import_matplotlib():
     global plt

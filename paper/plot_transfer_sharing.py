@@ -11,9 +11,8 @@ import os
 basedir = "out/transfer_sharing"
 os.makedirs(basedir, exist_ok=True)
 
-def run(name: str, shape: List[int], y_lim=None, coord=None):
-
-    runs = lib.get_runs([name])
+def run(name: str, shape: List[int], y_lim=None, coord=None, lloc="upper center", lncol=2, **kwargs):
+    runs = lib.get_runs([name], **kwargs)
 
     trackers = {}
 
@@ -24,7 +23,8 @@ def run(name: str, shape: List[int], y_lim=None, coord=None):
             if k not in trackers:
                 trackers[k] = StatTracker()
 
-            trackers[k].add(s*100)
+            # trackers[k].add(s*100)
+            trackers[k].add(s)
 
 
     perm_by_layer = {}
@@ -48,7 +48,7 @@ def run(name: str, shape: List[int], y_lim=None, coord=None):
     d = n_col + 1
 
     names = OrderedDict()
-    names["Layer 1"] = "layers_0_weight"
+    # names["Layer 1"] = "layers_0_weight"
     names["Layer 2"] = "layers_1_weight"
     names["Layer 3"] = "layers_2_weight"
     names["Layer 4"] = "layers_3_weight"
@@ -58,16 +58,16 @@ def run(name: str, shape: List[int], y_lim=None, coord=None):
         plt.bar([i*d + j for i in range(len(names))], [s.mean for s in stats], yerr=[s.std for s in stats], align='center')
 
     plt.xticks([d * x + n_col/2 - 0.5  for x in range(len(names))], names.keys())
-    plt.legend([f"T{c*2+2}" for c in range(n_col)], ncol=2,  loc="upper center")
-    plt.ylabel("Weights shared [\\%]")
+    plt.legend([f"T{c*2+2}" for c in range(n_col)], ncol=lncol,  loc=lloc,  columnspacing=1)
+    plt.ylabel("Proportion")
     if y_lim is not None:
         plt.ylim(*y_lim)
 
-    if coord is not None:
-        fig.axes[0].yaxis.set_label_coords(*coord)
+    # if coord is not None:
+    #     fig.axes[0].yaxis.set_label_coords(*coord)
     fig.savefig(f"{basedir}/{name}.pdf", bbox_inches='tight', pad_inches = 0.01)
 
 
-run("transfer_sharing_long", [4,1.3], coord=(-0.1, 0.4))
-run("transfer_sharing_prefer_old", [4,2], y_lim=(0,85))
-run("transfer_sharing_prefer_old_even_more", [4,2], y_lim=(0,85))
+run("transfer_sharing", [4,1.2],  y_lim=(0,1), lloc="upper left", lncol=3, coord=(-0.1, 0.4))
+run("transfer_sharing_prefer_old", [4,2], y_lim=(0,1), lncol=3, lloc="upper left")
+run("transfer_sharing_prefer_old_even_more", [4,2], y_lim=(0,1), lncol=3, lloc="lower right")

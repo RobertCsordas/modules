@@ -1,0 +1,46 @@
+program: main.py
+command:
+  - ${env}
+  - python3
+  - ${program}
+  - ${args}
+method: grid
+metric:
+  name: validation/mean_accuracy
+  goal: maximize
+parameters:
+  name:
+    value: tuple_feedforward_big_copyweight
+  log:
+    value: wandb
+  task:
+    value: tuple_ff_copyweight
+  stop_after:
+    value: 20000
+  layer_sizes:
+    distribution: categorical
+    values:
+      - "2000,2000,2000,2000"
+  n_digits:
+    value: 2
+  mask_loss_weight:
+    value: 0.0004
+  mask_lr:
+    value: 1e-2
+  step_per_mask:
+    value: 20000
+  bias_no_mask:
+    value: 1
+  sweep_id_for_grid_search:
+    distribution: categorical
+    values:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10

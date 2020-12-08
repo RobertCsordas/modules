@@ -1,12 +1,11 @@
 import torch
 import torch.nn.functional as F
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Optional
 from models.encoder_decoder import add_eos
 from dataclasses import dataclass
 import random
 from ..result import Result
 from ..model_interface import ModelInterface
-
 
 @dataclass
 class EncoderDecoderResult(Result):
@@ -20,14 +19,15 @@ class EncoderDecoderResult(Result):
 
 
 class EncoderDecoderInterface(ModelInterface):
-    def __init__(self, model):
+    def __init__(self, model, eos_token: int):
         self.model = model
+        self.eos_token = eos_token
 
     def loss(self, outputs: torch.Tensor, data: Dict[str, torch.Tensor]) -> torch.Tensor:
         mask = torch.arange(outputs.shape[0], device=data["out_len"].device).unsqueeze(1) <=\
                 data["out_len"].unsqueeze(0)
 
-        ref = add_eos(data["out"], data["out_len"], self.model.model.decoder.eos_token)
+        ref = add_eos(data["out"], data["out_len"], self.eos_token)
 
         l = F.cross_entropy(outputs.flatten(end_dim=-2), ref.long().flatten(), reduction='none')
         l = l.reshape_as(ref) * mask

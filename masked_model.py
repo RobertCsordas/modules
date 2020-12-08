@@ -8,7 +8,6 @@ from torch.nn.parallel import replicate, scatter
 from torch.nn.parallel.replicate import _broadcast_coalesced_reshape
 from torch.cuda._utils import _get_device_index
 
-
 @dataclass
 class ParameterPointer:
     parent: torch.nn.Module
@@ -139,7 +138,7 @@ class MaskedModel(torch.nn.Module):
             return self.sample_mask(self.active_masks[name], self.n_mask_samples if self.training else 0)
 
     def is_masked(self, name: str):
-        return name in self.masked_params
+        return name in self.masked_params and  (self.temporary_masks is None or name in self.temporary_masks)
 
     def update_params(self):
         for name, ptr in self.pointers.items():

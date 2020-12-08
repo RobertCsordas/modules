@@ -6,6 +6,7 @@ from typing import List, Dict, Optional
 
 gpu_fake_usage = []
 
+
 def get_memory_usage() -> Optional[Dict[int, int]]:
     try:
         proc = subprocess.Popen("nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits".split(" "),

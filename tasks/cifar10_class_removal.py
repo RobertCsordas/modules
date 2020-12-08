@@ -6,7 +6,9 @@ import torch
 import torch.utils.data
 import framework
 from framework.visualize import plot
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Set
+from masked_model import Masks
+import math
 
 
 class Cifar10ClassRemovalTask(Task):
@@ -89,6 +91,7 @@ class Cifar10ClassRemovalTask(Task):
                         confusion_ref = confusion
                         self.export_tensor("class_removal/confusion_reference", confusion_ref)
                         log = {"class_removal/confusion_reference": self.draw_confusion_heatmap(confusion_ref)}
+                        log.update(self.do_half_mask_test(0, "control"))
                     else:
                         diff = confusion - confusion_ref
                         log_name = f"class_removal/confusion_difference/{split}"
@@ -111,3 +114,17 @@ class Cifar10ClassRemovalTask(Task):
                                   self.plot_selected_masks([0, stage] if stage > 0 else [0]).items()})
 
                 self.helper.summary.log(plots)
+
+    def get_half_mask_masked_layer_names(self, masks: Masks) -> List[Set[str]]:
+        names = list(sorted(masks.keys()))
+
+        feature_index = list(sorted([int(o.split("_")[1]) for o in names if o.startswith("features_") and
+                                     o.endswith("_weight")]))
+
+        n_out = sum(o.startswith("out_") and o.endswith("_weight") for o in names)
+        n_keep = math.ceil((len(feature_index) + n_out)/2)
+        assert n_keep < len(feature_index)
+
+        feature_index = feature_index[:n_keep]
+
+        return [set(sum([[n for n in names if n.startswith(f"features_{i}_")] for i in feature_index], []))]

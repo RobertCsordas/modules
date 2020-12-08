@@ -2,8 +2,8 @@ from .task import Task
 import torch
 from models import TransformerEncDecModel
 from interfaces import TransformerEncDecInterface
+from layers.transformer import Transformer
 import math
-
 
 class TransformerTask(Task):
     def create_model(self) -> torch.nn.Module:
@@ -13,6 +13,7 @@ class TransformerTask(Task):
                                     num_encoder_layers=self.helper.opt.transformer.encoder_n_layers,
                                     num_decoder_layers=self.helper.opt.transformer.decoder_n_layers,
                                     ff_multipiler=self.helper.opt.transformer.ff_multiplier,
+                                    transformer=Transformer,
                                     tied_embedding=True)
 
     def create_model_interface(self):

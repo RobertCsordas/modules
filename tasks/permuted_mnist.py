@@ -63,6 +63,19 @@ class PermutedMnistTask(Task):
                 self.model.masks[index][name].masked_fill_(used, self.helper.opt.transfer.mask_used_init)
                 self.model.masks[index][name].masked_fill_(~used, self.helper.opt.transfer.mask_new_init)
 
+    def masks_remove_first_layer(self, perm: int):
+        if not self.helper.opt.transfer.reset_first_layer or perm==0:
+            return
+
+        print("Reinitializing the first layer")
+        del self.weight_masks["layers_0_weight"]
+        del self.weight_masks["layers_0_bias"]
+
+        with torch.no_grad():
+            self.model.masks[perm]["layers_0_weight"].fill_(self.helper.opt.transfer.mask_new_init)
+            self.model.masks[perm]["layers_0_bias"].fill_(self.helper.opt.transfer.mask_new_init)
+
+
     def set_perm(self, perm: int):
         self.curr_perm = perm
         self.model.set_active(perm)
@@ -70,6 +83,8 @@ class PermutedMnistTask(Task):
         self.train_loader = self.create_train_loader(self.train_set)
 
         self.weight_masks = self.create_used_masks(perm)
+        self.masks_remove_first_layer(perm)
+
         self.reinit_weights(self.weight_masks)
         self.init_masks(self.weight_masks, perm)
 
@@ -112,6 +127,18 @@ class PermutedMnistTask(Task):
 
         return res
 
+    def finalize_permutation(self, perm: int):
+        self.export_masks(perm)
+
+        plots = self.plot_masks(perm, None)
+        if perm > 0:
+            plots.update(self.plot_mask_stats(perm))
+
+        plots.update(self.validate_on_names([f"perm_{i}" for i in range(perm)]))
+
+        plots = {f"permuted_mnist/perm_{perm}/{k}": v for k, v in plots.items()}
+        self.log_plots(plots)
+
     def post_train(self):
         for perm in range(self.n_prems):
             print(f"Permutation {perm}")
@@ -121,16 +148,7 @@ class PermutedMnistTask(Task):
 
             for d in self.train_loader:
                 if self.helper.state.iter - start > self.helper.opt.stop_after:
-                    self.export_masks(perm)
-
-                    plots = self.plot_masks(perm, None)
-                    if perm > 0:
-                        plots.update(self.plot_mask_stats(perm))
-
-                    plots.update(self.validate_on_names([f"perm_{i}" for i in range(perm)]))
-
-                    plots = {f"permuted_mnist/perm_{perm}/{k}": v for k, v in plots.items()}
-                    self.log_plots(plots)
+                    self.finalize_permutation(perm)
                     break
 
                 res = self.train_step(d)

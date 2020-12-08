@@ -3,7 +3,8 @@ import dataset
 from models import LSTMModel
 from interfaces.recurrent import TupleArithmeticDatasetInterface
 import torch
-from typing import Dict, Any
+from typing import Dict, Any, List, Set
+from masked_model import Masks
 
 
 class TupleTask(Task):
@@ -49,9 +50,15 @@ class TupleTask(Task):
     def analysis_stage_finished(self, index: int, name: str):
         self.model_interface.restrict(-1)
         log = self.do_inverse_mask_test(index)
+        if index==0:
+            log.update(self.do_half_mask_test(index))
         log.update({f"final_accuracy/{index}/{k}": v for k, v in self.validate().items()})
         self.export_masks(index)
         self.helper.summary.log(log)
+
+    def get_half_mask_masked_layer_names(self, masks: Masks) -> List[Set[str]]:
+        names = list(sorted(masks.keys()))
+        return [set(names[:len(names)//2])]
 
     def analysis_periodic_plot(self, index: int, name: str) -> Dict[str, Any]:
         return self.plot_masks(index)
@@ -59,3 +66,6 @@ class TupleTask(Task):
     def post_train(self):
         super().post_train()
         self.helper.summary.log(self.plot_mask_sharing(range(1, len(self.model.masks))))
+
+    def inv_mask_test_get_exluded(self) -> Set[str]:
+        return {"lstm_cells_0_weight_ih"}.union({k for k in self.model.masks[0].keys() if k.startswith("output_projection_")})

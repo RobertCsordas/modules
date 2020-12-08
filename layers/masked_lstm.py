@@ -7,7 +7,6 @@ from .masked_module import MaskedModule
 import torch.nn.functional as F
 from torch.nn.utils.rnn import PackedSequence
 
-
 class LSTMCell(MaskedModule):
     def __init__(self, input_size, hidden_size):
         super().__init__()
@@ -127,6 +126,7 @@ class LSTM(torch.nn.Module):
         state = self.permute_state([self.cat_states(list(reversed(ll))) for ll in ended_in_step_per_layer],
                                    input.unsorted_indices)
         return torch.nn.utils.rnn.pack_padded_sequence(unpacked, seq_len, enforce_sorted=False), state
+
 
     def forward(self, input: Union[torch.Tensor, PackedSequence], state:Optional[List[torch.Tensor]]=None) -> \
             Tuple[Union[torch.Tensor, PackedSequence], List[Tuple[torch.Tensor, torch.Tensor]]]:

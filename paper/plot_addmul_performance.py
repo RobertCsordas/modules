@@ -46,6 +46,40 @@ def plot_both(ff, rnn):
     os.makedirs(os.path.dirname(fname), exist_ok=True)
     fig.savefig(fname, bbox_inches='tight')
 
+    print("\\begin{tabular}{ll|c|cc|cc}")
+    print("\\toprule")
+    print(" & ".join(["", ""] + names) + " \\\\")
+    print("\\midrule")
+
+    row = ["\\multirow{2}{*}{FNN}"]
+    for t in range(2):
+        this_stats = [ff_stats[f"{plots[n]}{ops[t]}/accuracy"].get() for n in names]
+        row.append(f"Pair {t}")
+
+        for m, s in zip([s.mean * 100 for s in this_stats], [s.std * 100 for s in this_stats]):
+            row.append(f"${m:.0f} \pm {s:.1f}$")
+
+        print(" & ".join(row) + " \\\\")
+        row = [""]
+
+    print("\\midrule")
+    row = ["\\multirow{2}{*}{LSTM}"]
+    for t in range(2):
+        this_stats = [rnn_stats[f"{plots[n]}{ops[t]}/accuracy"].get() for n in names]
+        row.append(f"Pair {t}")
+
+        for m, s in zip([s.mean * 100 for s in this_stats], [s.std * 100 for s in this_stats]):
+            row.append(f"${m:.0f} \pm {s:.1f}$")
+
+        print(" & ".join(row) + " \\\\")
+        row = [""]
+
+    print("\\bottomrule")
+    print("\end{tabular}")
+
+
+
+
 
 rnn_runs = lib.get_runs(["addmul_rnn"])
 feedforward_runs = lib.get_runs(["addmul_feedforward_big"])

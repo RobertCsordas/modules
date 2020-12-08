@@ -17,7 +17,6 @@ def group(runs, config_names: List[str], get_config = lambda run, name: run.conf
 
     return res
 
-
 def calc_stat(group_of_runs: Dict[str, List[any]], filter) -> Dict[str, Dict[str, StatTracker]]:
     all_stats = {}
 

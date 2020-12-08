@@ -2,7 +2,7 @@ import framework
 import tasks
 import os
 import torch
-
+# torch.backends.cudnn.enabled = False
 
 def register_args(parser: framework.helpers.ArgumentParser):
     parser.add_argument("-batch_size", default=128)
@@ -37,6 +37,7 @@ def register_args(parser: framework.helpers.ArgumentParser):
     parser.add_argument("-encoder_decoder.embedding_size", default=16)
     parser.add_argument("-transfer.mask_new_init", default=2.0)
     parser.add_argument("-transfer.mask_used_init", default=2.0)
+    parser.add_argument("-transfer.reset_first_layer", default=True)
     parser.add_argument("-transformer.n_heads", default=4)
     parser.add_argument("-transformer.use_paper_lr_schedule", default=False)
     parser.add_argument("-transformer.ff_multiplier", default=2.0)
@@ -51,6 +52,7 @@ def register_args(parser: framework.helpers.ArgumentParser):
     parser.add_argument("-dm_math.masks_splits", default="easy", parser=parser.str_list_parser)
     parser.add_argument("-mask_stability.measure_on", default="minimal", choice=["minimal", "all"])
     parser.add_argument("-masking.warmup.nsteps", default=0)
+    parser.add_argument("-inv_mask_exclude_io", default="none", choice=["none", "fullmask", "ones"])
     parser.add_argument("-restore_pretrained", type=str)
     parser.add_argument("-test_pretrained", default=1)
     parser.add_argument("-train_baseline", default=False, help="Train the model on easy task and test on hard,"
@@ -162,9 +164,11 @@ def load_weights(helper: framework.helpers.TrainingHelper, task: tasks.Task):
 
     data = torch.load(pretrained)
     ver = data.get("VERSION", 0)
-    assert ver==1
-    task.model.model.load_state_dict(data["state"])
-    task.model.model_parameters.load_state_dict(data["parameters"])
+    if ver == 0:
+        task.model.model_parameters.load_state_dict(data)
+    else:
+        task.model.model.load_state_dict(data["state"])
+        task.model.model_parameters.load_state_dict(data["parameters"])
 
 
 def main():
@@ -186,7 +190,8 @@ def main():
         "cifar10_mask_stability": tasks.Cifar10MaskStabilityTask,
         "cifar10_grad_cos_distance": tasks.Cifar10GradCosDistanceTask,
         "permuted_mnist": tasks.PermutedMnistTask,
-        "deepmind_math": tasks.DeepmindMathTask
+        "deepmind_math": tasks.DeepmindMathTask,
+        "tuple_ff_copyweight": tasks.TupleFeedforwardCopyweightTask
     }
 
     task = constructors.get(helper.opt.task, invalid_task_error)(helper)

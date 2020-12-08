@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import wandb
 import os
 from typing import List, Dict
@@ -34,7 +33,7 @@ print(runs.keys())
 
 def draw_confusion(means: np.ndarray, std: np.ndarray):
     print("MEAN", means)
-    figure = plt.figure(figsize=[2.5,0.5])
+    figure = plt.figure(figsize=[2.5,0.5])#means.shape)
 
     ax = plt.gca()
     im = plt.imshow(means, interpolation='nearest', cmap=plt.cm.viridis, aspect='auto', vmin=0, vmax=100)
@@ -65,7 +64,6 @@ def draw_confusion(means: np.ndarray, std: np.ndarray):
 
     # plt.tight_layout()
     return figure
-
 
 def create_trackers(runs):
     trackers = {}

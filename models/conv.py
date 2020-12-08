@@ -1,7 +1,6 @@
 import torch
 from layers import Conv2d, Linear
 
-
 class ConvModel(torch.nn.Module):
     def __init__(self, in_channels: int, out_channels: int, dropout: bool = True):
         super().__init__()

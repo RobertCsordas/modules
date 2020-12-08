@@ -10,3 +10,4 @@ wandb==0.10.2
 dataclasses==0.6
 Pillow==7.2.0
 torchvision==0.7.0
+gql==0.2.0

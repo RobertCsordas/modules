@@ -10,11 +10,27 @@ metric:
   goal: maximize
 parameters:
   name:
-    value: cifar10_resnet
+    value: tuple_feedforward_small_halfmask
   log:
     value: wandb
-  profile:
-    value: cifar10_resnet_hp
+  task:
+    value: tuple_ff
+  stop_after:
+    value: 20000
+  layer_sizes:
+    distribution: categorical
+    values:
+      - "800,800,800,800"
+  n_digits:
+    value: 2
+  mask_loss_weight:
+    value: 0.0004
+  mask_lr:
+    value: 1e-2
+  step_per_mask:
+    value: 20000
+  bias_no_mask:
+    value: 1
   sweep_id_for_grid_search:
     distribution: categorical
     values:
@@ -28,9 +44,3 @@ parameters:
       - 8
       - 9
       - 10
-  mask_loss_weight:
-    value: 2e-5
-  step_per_mask:
-    value: 30000
-  mask_lr:
-    value: 3e-2
