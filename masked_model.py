@@ -110,7 +110,7 @@ class MaskedModel(torch.nn.Module):
         n_total = self._count_params(self.model_parameters.values())
         n_masked = self._count_params(self.masks[0].values())
 
-        print(f"Masing {n_masked} out of {n_total} parameters ({n_masked*100/n_total:.1f} %)")
+        print(f"Masking {n_masked} out of {n_total} parameters ({n_masked*100/n_total:.1f} %)")
 
         single_sample_params = [k for k in self.masked_params if not self.pointers[k].multimask_support]
 
