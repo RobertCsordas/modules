@@ -27,7 +27,7 @@ for p, pval in config["parameters"].items():
             args.append(pval["values"][0])
         else:
             while True:
-                print(f"Choose value for \"p\"")
+                print(f"Choose value for \"{p}\"")
                 for i, v in enumerate(pval["values"]):
                     print(f"  {i+1}: {v}")
 
