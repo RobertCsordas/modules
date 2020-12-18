@@ -1,9 +1,9 @@
-from .task import Task, TaskDataset
-import dataset
 from models import EncoderDecoder
 from interfaces.recurrent import EncoderDecoderInterface
 import torch
 from .scan_transformer import TransformerScanTask
+from .task import Task
+
 
 class ScanTask(TransformerScanTask):
     def create_model(self) -> torch.nn.Module:
@@ -20,3 +20,5 @@ class ScanTask(TransformerScanTask):
     def prepare_model_for_analysis(self):
         # The model is not trained anymore. Dropouts are not needed.
         self.model.model.set_dropout(False)
+
+    get_half_mask_masked_layer_names = Task.get_half_mask_masked_layer_names
