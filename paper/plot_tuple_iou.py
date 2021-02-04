@@ -129,4 +129,3 @@ def do_plot(runs, prefix):
         fig.savefig(f, bbox_inches='tight')
 
 do_plot(lib.get_runs(["tuple_rnn", "tuple_feedforward_big"]), "out/tuple_iou")
-do_plot(lib.get_runs(["tuple_rnn_copyweight"]), "out/tuple_iou_copyweight")
