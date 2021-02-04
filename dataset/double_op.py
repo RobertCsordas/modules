@@ -45,7 +45,7 @@ class DoubleOpDataset(torch.utils.data.Dataset):
         super().__init__()
         self.n_digits = n_digits
         self.set = set
-        self.full_name = f"{set}_{n_digits}"
+        self.full_name = f"{self.__class__.__name__}_{set}_{n_digits}_{n_samples}"
         self.classes = self.OP_IDS
 
         if self.full_name not in self.DATA:
@@ -57,9 +57,9 @@ class DoubleOpDataset(torch.utils.data.Dataset):
 
         self.data = self.DATA[self.full_name]
         if restrict:
-            mask = True
+            mask = False
             for r in restrict:
-                mask = (self.data["op"] == self.OP_IDS.index(r)) & mask
+                mask = (self.data["op"] == self.OP_IDS.index(r)) | mask
 
             self.data = {
                 "args": self.data["args"][mask],
