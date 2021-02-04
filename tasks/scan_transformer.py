@@ -20,8 +20,8 @@ class TransformerScanTask(TransformerTask):
             self.valid_sets[s] = dataset.Scan(["test"], split_type=[s])
 
         for split in ["simple"] + self.helper.opt.scan.analyze_splits:
-            self.tasks.append(TaskDataset(split, lambda: dataset.Scan(["train"], split_type=[split]),
-                                          self.valid_sets.iid))
+            self.tasks.append(TaskDataset(split, (lambda split_c: lambda: dataset.Scan(["train"],
+                                          split_type=[split_c]))(split), self.valid_sets.iid))
 
     def post_train(self):
         super().post_train()

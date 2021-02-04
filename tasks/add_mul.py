@@ -19,8 +19,8 @@ class AddMulTask(Task):
 
         for n in ["add", "mul"]:
             self.tasks.append(
-                TaskDataset(n, lambda: dataset.AddMul("train", 1000000, self.helper.opt.n_digits, restrict=[n]),
-                            self.valid_sets.iid)
+                TaskDataset(n, (lambda name: lambda: dataset.AddMul("train", 1000000,
+                                self.helper.opt.n_digits, restrict=[name]))(n), self.valid_sets.iid)
             )
 
     def create_model(self) -> torch.nn.Module:
