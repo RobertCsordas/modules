@@ -125,7 +125,7 @@ class LSTM(torch.nn.Module):
 
         state = self.permute_state([self.cat_states(list(reversed(ll))) for ll in ended_in_step_per_layer],
                                    input.unsorted_indices)
-        return torch.nn.utils.rnn.pack_padded_sequence(unpacked, seq_len, enforce_sorted=False), state
+        return torch.nn.utils.rnn.pack_padded_sequence(unpacked, seq_len.cpu(), enforce_sorted=False), state
 
 
     def forward(self, input: Union[torch.Tensor, PackedSequence], state:Optional[List[torch.Tensor]]=None) -> \

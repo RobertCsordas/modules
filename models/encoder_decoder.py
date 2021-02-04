@@ -37,7 +37,7 @@ class Encoder(torch.nn.Module):
         net = self.embedding(inputs.long())
         net = F.dropout(net, self.dropout, training=self.training)
 
-        ps = torch.nn.utils.rnn.pack_padded_sequence(net, lengths, enforce_sorted=False)
+        ps = torch.nn.utils.rnn.pack_padded_sequence(net, lengths.cpu(), enforce_sorted=False)
         _, state = self.lstm(ps)
         return state
 
@@ -68,7 +68,7 @@ class Decoder(torch.nn.Module):
         lengths = lengths + 1
         net = F.dropout(self.embedding(ref_output.long()), self.dropout, training=self.training)
 
-        ps = torch.nn.utils.rnn.pack_padded_sequence(net, lengths, enforce_sorted=False)
+        ps = torch.nn.utils.rnn.pack_padded_sequence(net, lengths.cpu(), enforce_sorted=False)
         ps, _ = self.lstm(ps, hidden)
         net, _ = torch.nn.utils.rnn.pad_packed_sequence(ps, total_length=ref_output.shape[0])
         return self.output_projection(net)
