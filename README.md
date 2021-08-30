@@ -80,3 +80,15 @@ Networks require porting to be able to be analyzed. This is because ordinary set
 The current implementation has numerous compatible layers in the ```layers``` directory and networks in the ```models``` directory.
 
 Analyze networks without modification is possible by sacrificing speed and modifying the code. For simulating K mask samples and batch size B, one should run K forward-backward passes with a single mask sample and batch size of B/K. The optimizer should be called after the K passes. Using one mask sample on the unmodified network is already supported by ```masked_model.py```. Alternatively, one can start K processes and run the forward passes in parallel and accumulate the masks' gradients.
+
+# BibText
+```
+@inproceedings{csordas2021neural,
+      title={Are Neural Nets Modular? Inspecting Functional Modularity Through Differentiable Weight Masks}, 
+      author={R\'obert Csord\'as and Sjoerd van Steenkiste and J\"urgen Schmidhuber},
+      booktitle={Int. Conf. on Learning Representations (ICLR)},
+      year={2021},
+      month={May},
+      address={Virtual only}
+}
+```
